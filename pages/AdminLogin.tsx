@@ -26,7 +26,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-950 p-8 items-center justify-center relative overflow-hidden">
+    <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-950 p-6 items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent opacity-50" />
       
       <button 
@@ -40,8 +40,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onBack }) => {
         <ShieldAlert size={48} className="text-red-600 animate-pulse" />
       </div>
 
-      <div className="text-center mb-10 relative z-10">
-        <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Admin Terminal</h2>
+      <div className="text-center mb-6 relative z-10">
+        <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">Admin Terminal</h2>
         <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-2">Restricted Access Only</p>
       </div>
 

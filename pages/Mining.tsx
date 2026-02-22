@@ -190,38 +190,38 @@ const Mining: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 pb-32 animate-in fade-in duration-700 bg-gray-50 dark:bg-gray-950 min-h-full overflow-hidden relative">
+    <div className="p-4 space-y-4 pb-28 animate-in fade-in duration-700 bg-gray-50 dark:bg-gray-950 min-h-full overflow-hidden relative">
       <TechGrid />
       <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-blue-600/5 to-transparent pointer-events-none" />
 
       {/* Guided Header */}
-      <div className="text-center space-y-2 pt-2 relative z-10">
-        <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none flex items-center justify-center gap-3">
-           {isVisualPremium && <ZapIcon size={28} className="text-orange-500 fill-current animate-pulse" />}
+      <div className="text-center space-y-1 pt-2 relative z-10">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none flex items-center justify-center gap-2">
+           {isVisualPremium && <ZapIcon size={24} className="text-orange-500 fill-current animate-pulse" />}
            Mining
         </h2>
-        <div className="flex items-center justify-center gap-2">
-           <span className="text-[9px] text-gray-400 font-black uppercase tracking-[0.2em]">Automated Mining</span>
-           <button onClick={() => setShowTooltip(showTooltip === 'main' ? null : 'main')} className="text-blue-500 hover:scale-110 transition-transform"><HelpCircle size={14} /></button>
+        <div className="flex items-center justify-center gap-1.5">
+           <span className="text-[8px] text-gray-400 font-black uppercase tracking-[0.2em]">Automated Mining</span>
+           <button onClick={() => setShowTooltip(showTooltip === 'main' ? null : 'main')} className="text-blue-500 hover:scale-110 transition-transform"><HelpCircle size={12} /></button>
         </div>
       </div>
 
       {/* Status Steps */}
-      <div className="grid grid-cols-3 gap-2 relative z-10 px-2">
+      <div className="grid grid-cols-3 gap-2 relative z-10 px-1">
          {[
-           { label: 'Ignite', active: !isMiningActive && !isMiningComplete && !isCooldownActive, done: isMiningActive || isMiningComplete, icon: <Zap size={14} /> },
-           { label: 'Extract', active: isMiningActive, done: isMiningComplete, icon: <Cpu size={14} /> },
-           { label: 'Stabilize', active: isMiningComplete, done: false, icon: <Gift size={14} /> }
+           { label: 'Ignite', active: !isMiningActive && !isMiningComplete && !isCooldownActive, done: isMiningActive || isMiningComplete, icon: <Zap size={12} /> },
+           { label: 'Extract', active: isMiningActive, done: isMiningComplete, icon: <Cpu size={12} /> },
+           { label: 'Stabilize', active: isMiningComplete, done: false, icon: <Gift size={12} /> }
          ].map((step, i) => (
-           <div key={i} className={`p-3 rounded-2xl border text-center space-y-1 transition-all duration-500 ${step.active ? 'bg-blue-600 border-blue-400 text-white scale-105 shadow-lg' : (step.done ? 'bg-green-500/10 border-green-500/30 text-green-500 opacity-60' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400')}`}>
-              <div className="flex justify-center">{step.done ? <CheckCircle2 size={14} /> : step.icon}</div>
-              <p className="text-[8px] font-black uppercase tracking-widest leading-none">{step.label}</p>
+           <div key={i} className={`p-2.5 rounded-xl border text-center space-y-1 transition-all duration-500 ${step.active ? 'bg-blue-600 border-blue-400 text-white scale-105 shadow-lg' : (step.done ? 'bg-green-500/10 border-green-500/30 text-green-500 opacity-60' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400')}`}>
+              <div className="flex justify-center">{step.done ? <CheckCircle2 size={12} /> : step.icon}</div>
+              <p className="text-[7px] font-black uppercase tracking-widest leading-none">{step.label}</p>
            </div>
          ))}
       </div>
 
       {/* REACTION CORE - ADVANCED VISUALS */}
-      <div className="relative py-6 flex flex-col items-center justify-center">
+      <div className="relative py-4 flex flex-col items-center justify-center">
          {isVisualPremium && isMiningActive && (
             <>
                <ElectricArc color="#fb923c" delay="0s" rotation="rotate-0" />
@@ -232,13 +232,13 @@ const Mining: React.FC = () => {
 
          <div 
            onClick={handleCoreTap}
-           className={`relative w-72 h-72 flex items-center justify-center group cursor-pointer transition-transform ${isMiningActive ? 'active:scale-110' : 'active:scale-95'}`}
+           className={`relative w-48 h-48 flex items-center justify-center group cursor-pointer transition-transform ${isMiningActive ? 'active:scale-110' : 'active:scale-95'}`}
          >
             <div className={`absolute inset-0 rounded-full border-2 border-dashed border-blue-500/10 ${isMiningActive ? 'animate-spin-slow' : ''}`} />
             
             <div 
-              className={`relative w-48 h-48 rounded-[64px] bg-white dark:bg-gray-900 shadow-xl flex items-center justify-center border-4 border-gray-100 dark:border-gray-800 overflow-hidden transition-all duration-700 ${isMiningActive ? 'shadow-blue-500/20 border-blue-400' : (isMiningComplete ? 'shadow-green-500/20 border-green-500' : '')} ${isVisualPremium && isMiningActive ? 'animate-plasma-glow border-orange-500' : ''}`}
-              style={{ boxShadow: isMiningActive ? `0 0 ${20 + progressPercent/2}px ${isVisualPremium ? 'rgba(249, 115, 22, 0.4)' : 'rgba(59, 130, 246, 0.3)'}` : 'none' }}
+              className={`relative w-32 h-32 rounded-3xl bg-white dark:bg-gray-900 shadow-xl flex items-center justify-center border-4 border-gray-100 dark:border-gray-800 overflow-hidden transition-all duration-700 ${isMiningActive ? 'shadow-blue-500/20 border-blue-400' : (isMiningComplete ? 'shadow-green-500/20 border-green-500' : '')} ${isVisualPremium && isMiningActive ? 'animate-plasma-glow border-orange-500' : ''}`}
+              style={{ boxShadow: isMiningActive ? `0 0 ${15 + progressPercent/3}px ${isVisualPremium ? 'rgba(249, 115, 22, 0.4)' : 'rgba(59, 130, 246, 0.3)'}` : 'none' }}
             >
                {/* Plasma Liquid Fill */}
                <div 

@@ -58,7 +58,7 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
   const isVIP = currentUser?.tag === UserTag.PASS;
 
   return (
-    <header className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-4 shadow-2xl z-[100] relative overflow-hidden transition-all duration-700 border-b border-gray-100 dark:border-white/10">
+    <header className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-3 shadow-xl z-[100] relative overflow-hidden transition-all duration-700 border-b border-gray-100 dark:border-white/10">
       <div className="absolute top-0 right-0 w-48 h-48 bg-blue-600/10 rounded-full blur-[60px] -mr-24 -mt-24 pointer-events-none" />
       
       <div className="flex justify-between items-center relative z-10">
@@ -66,11 +66,11 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <div className="flex -space-x-4">
             <div 
               onClick={() => { playSound('tap'); setActiveTab('home'); }}
-              className="w-11 h-11 rounded-[14px] border-2 border-gray-200 dark:border-white/40 bg-white p-1.5 shadow-2xl z-20 overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-90"
+              className="w-10 h-10 rounded-xl border-2 border-gray-200 dark:border-white/40 bg-white p-1.5 shadow-2xl z-20 overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-90"
             >
               <img src={logoUrl || './logo.png'} alt="STK" className="w-full h-full object-contain" />
             </div>
-            <div className="w-11 h-11 rounded-[14px] border-2 border-gray-100 dark:border-white/20 overflow-hidden bg-blue-600/20 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner z-10 grayscale-[0.3]">
+            <div className="w-10 h-10 rounded-xl border-2 border-gray-100 dark:border-white/20 overflow-hidden bg-blue-600/20 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner z-10 grayscale-[0.3]">
               {isAdmin ? (
                  <ShieldAlert className="w-6 h-6 text-red-400" />
               ) : (

@@ -43,23 +43,23 @@ const Tasks: React.FC = () => {
   const customTasks = currentUser.tasks.filter(t => t.type === 'CUSTOM');
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-700 pb-40 min-h-full bg-gray-50 dark:bg-gray-950">
+    <div className="p-4 space-y-4 animate-in fade-in duration-700 pb-28 min-h-full bg-gray-50 dark:bg-gray-950">
       <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-blue-600/10 to-transparent pointer-events-none" />
 
-      <div className="space-y-3 relative z-10 pt-4">
-        <div className="flex items-center gap-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-5 py-2 rounded-full w-fit border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:scale-105">
-          <BrainCircuit size={16} className="text-blue-600 dark:text-blue-400 animate-pulse" />
-          <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest italic">Task List</span>
+      <div className="space-y-2 relative z-10 pt-4">
+        <div className="flex items-center gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 py-1.5 rounded-full w-fit border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:scale-105">
+          <BrainCircuit size={14} className="text-blue-600 dark:text-blue-400 animate-pulse" />
+          <span className="text-[8px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest italic">Task List</span>
         </div>
-        <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none">Daily Tasks</h2>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest max-w-[240px]">Complete tasks to earn extra coins every day.</p>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none">Daily Tasks</h2>
+        <p className="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest max-w-[240px]">Complete tasks to earn extra coins every day.</p>
       </div>
 
       {/* App Activities */}
-      <div className="space-y-6 relative z-10">
-        <div className="flex items-center gap-3 px-2">
-           <Trophy size={14} className="text-yellow-500" />
-           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">System Tasks</h3>
+      <div className="space-y-4 relative z-10">
+        <div className="flex items-center gap-2 px-1">
+           <Trophy size={12} className="text-yellow-500" />
+           <h3 className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">System Tasks</h3>
         </div>
         
         {systemTasks.map(task => {
@@ -68,31 +68,31 @@ const Tasks: React.FC = () => {
           const isReady = progress >= total && !task.completed;
 
           return (
-            <div key={task.id} className={`bg-white dark:bg-gray-900 p-8 rounded-[40px] border-2 shadow-xl space-y-6 transition-all relative overflow-hidden group ${task.completed ? 'opacity-40 grayscale-0 border-gray-50 dark:border-gray-950 shadow-none' : 'border-gray-50 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-900/40'}`}>
+            <div key={task.id} className={`bg-white dark:bg-gray-900 p-4 rounded-2xl border-2 shadow-lg space-y-3 transition-all relative overflow-hidden group ${task.completed ? 'opacity-40 grayscale-0 border-gray-50 dark:border-gray-950 shadow-none' : 'border-gray-50 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-900/40'}`}>
               <div className="flex justify-between items-start relative z-10">
-                 <div className="flex items-center gap-5">
-                    <div className={`w-14 h-14 rounded-[22px] flex items-center justify-center shadow-lg transition-transform group-hover:rotate-6 ${task.completed ? 'bg-green-100 dark:bg-green-950 text-green-600' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
-                       {task.completed ? <CheckCircle2 size={32} /> : <CheckSquare size={32} />}
+                 <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:rotate-6 ${task.completed ? 'bg-green-100 dark:bg-green-950 text-green-600' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
+                       {task.completed ? <CheckCircle2 size={24} /> : <CheckSquare size={24} />}
                     </div>
                     <div>
-                       <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase leading-none italic">{task.title}</h4>
-                       <div className="flex items-center gap-2 mt-3">
-                          <div className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-3 py-1 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 border border-yellow-200 dark:border-yellow-900/30 shadow-sm">
-                             <Coins size={12} /> {task.reward} Coins
+                       <h4 className="text-base font-black text-gray-900 dark:text-white uppercase leading-none italic">{task.title}</h4>
+                       <div className="flex items-center gap-2 mt-2">
+                          <div className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-2.5 py-1 rounded-lg text-[8px] font-black uppercase flex items-center gap-1.5 border border-yellow-200 dark:border-yellow-900/30 shadow-sm">
+                             <Coins size={10} /> {task.reward} Coins
                           </div>
                        </div>
                     </div>
                  </div>
                  {task.completed ? (
-                   <span className="text-[9px] font-black text-green-600 uppercase italic bg-green-50 dark:bg-green-950 px-3 py-1 rounded-lg">Completed</span>
+                   <span className="text-[8px] font-black text-green-600 uppercase italic bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded-md">Done</span>
                  ) : (
-                   <span className="text-sm font-black font-mono text-gray-300 dark:text-gray-700 tracking-widest">{progress}/{total}</span>
+                   <span className="text-xs font-black font-mono text-gray-300 dark:text-gray-700 tracking-widest">{progress}/{total}</span>
                  )}
               </div>
               
               {!task.completed && (
-                <div className="space-y-4 relative z-10">
-                   <div className="h-4 bg-gray-50 dark:bg-black/50 rounded-full overflow-hidden p-1 border border-gray-100 dark:border-gray-800 shadow-inner">
+                <div className="space-y-3 relative z-10">
+                   <div className="h-3 bg-gray-50 dark:bg-black/50 rounded-full overflow-hidden p-0.5 border border-gray-100 dark:border-gray-800 shadow-inner">
                       <div className="h-full bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full transition-all duration-1000 relative" style={{ width: `${(progress/total) * 100}%` }}>
                          <div className="absolute inset-0 bg-white/20 animate-pulse" />
                       </div>

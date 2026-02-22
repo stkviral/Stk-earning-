@@ -55,39 +55,37 @@ const Videos: React.FC = () => {
   const progress = (currentUser.adsWatchedToday / MAX_DAILY_ADS) * 100;
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-700 pb-32 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="p-4 space-y-4 animate-in fade-in duration-700 pb-28 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
       
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none rounded-full" />
 
-      <div className="text-center space-y-2 pt-4 relative z-10">
-        <div className="inline-flex items-center gap-2 bg-blue-600/10 dark:bg-blue-400/10 px-4 py-1.5 rounded-full text-blue-600 dark:text-blue-400 font-black text-[10px] uppercase tracking-widest border border-blue-600/20">
-          <Activity size={12} className="animate-pulse" /> Live Status <Activity size={12} className="animate-pulse" />
+      <div className="text-center space-y-1 pt-4 relative z-10">
+        <div className="inline-flex items-center gap-1.5 bg-blue-600/10 dark:bg-blue-400/10 px-3 py-1 rounded-full text-blue-600 dark:text-blue-400 font-black text-[8px] uppercase tracking-widest border border-blue-600/20">
+          <Activity size={10} className="animate-pulse" /> Live Status <Activity size={10} className="animate-pulse" />
         </div>
-        <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight italic leading-tight">
+        <h1 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight italic leading-tight">
           Watch & Earn
         </h1>
-        <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
           {settings.adsEnabled ? 'Watch videos to earn free coins' : 'VIP Mode: Instant Rewards Active'}
         </p>
       </div>
 
-      <div className="relative flex flex-col items-center py-8">
-        <div className="relative w-64 h-64 flex items-center justify-center">
+      <div className="relative flex flex-col items-center py-2">
+        <div className="relative w-48 h-48 flex items-center justify-center">
            <div className={`absolute inset-0 rounded-full border-4 border-dashed border-blue-500/10 animate-spin-slow`} />
-           <div className={`absolute inset-10 rounded-full border-2 border-dashed border-blue-500/20 animate-orbit-ccw`} />
            
-           <div className={`w-40 h-40 rounded-[48px] bg-white dark:bg-gray-900 shadow-2xl flex flex-col items-center justify-center border-2 border-gray-100 dark:border-gray-800 transition-all duration-500 ${timeLeft > 0 || (settings.adsEnabled && isAdBlockerActive) ? 'grayscale opacity-50' : 'scale-105'}`}>
+           <div className={`w-28 h-28 rounded-3xl bg-white dark:bg-gray-900 shadow-xl flex flex-col items-center justify-center border-2 border-gray-100 dark:border-gray-800 transition-all duration-500 ${timeLeft > 0 || (settings.adsEnabled && isAdBlockerActive) ? 'grayscale opacity-50' : 'scale-105'}`}>
               <div className={`relative ${timeLeft === 0 && (!settings.adsEnabled || !isAdBlockerActive) ? 'animate-bounce' : ''}`}>
                  {settings.adsEnabled && isAdBlockerActive ? (
-                   <ShieldOff size={64} className="text-orange-500" />
+                   <ShieldOff size={48} className="text-orange-500" />
                  ) : (
-                   <PlayCircle size={64} className={timeLeft === 0 ? 'text-blue-600' : 'text-gray-300'} />
+                   <PlayCircle size={48} className={timeLeft === 0 ? 'text-blue-600' : 'text-gray-300'} />
                  )}
-                 {timeLeft === 0 && (!settings.adsEnabled || !isAdBlockerActive) && <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />}
               </div>
-              <div className="mt-2 text-center">
-                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Status</p>
-                 <p className={`text-[10px] font-black uppercase ${settings.adsEnabled && isAdBlockerActive ? 'text-red-500' : (timeLeft === 0 ? 'text-green-500' : 'text-orange-500')}`}>
+              <div className="mt-1 text-center">
+                 <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Status</p>
+                 <p className={`text-[9px] font-black uppercase ${settings.adsEnabled && isAdBlockerActive ? 'text-red-500' : (timeLeft === 0 ? 'text-green-500' : 'text-orange-500')}`}>
                    {settings.adsEnabled && isAdBlockerActive ? 'BLOCKED' : (timeLeft === 0 ? 'Ready' : `Wait ${timeLeft}s`)}
                  </p>
               </div>
@@ -137,7 +135,7 @@ const Videos: React.FC = () => {
         <button 
            onClick={handleWatchAd}
            disabled={timeLeft > 0 || currentUser.adsWatchedToday >= MAX_DAILY_ADS || (settings.adsEnabled && isAdBlockerActive)}
-           className={`w-full py-6 rounded-[32px] font-black text-xl shadow-2xl transition-all border-b-8 uppercase tracking-widest flex items-center justify-center gap-4 group ${
+           className={`w-full py-4 rounded-3xl font-black text-lg shadow-xl transition-all border-b-4 uppercase tracking-widest flex items-center justify-center gap-3 group ${
              timeLeft > 0 || currentUser.adsWatchedToday >= MAX_DAILY_ADS || (settings.adsEnabled && isAdBlockerActive)
              ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400 cursor-not-allowed grayscale'
              : 'bg-blue-600 border-blue-900 text-white active:scale-95 shadow-blue-500/20'
@@ -145,47 +143,47 @@ const Videos: React.FC = () => {
         >
            {settings.adsEnabled && isAdBlockerActive ? (
              <>
-               <ShieldOff size={24} /> LOCKED
+               <ShieldOff size={20} /> LOCKED
              </>
            ) : timeLeft > 0 ? (
              <>
-               <ZapOff size={24} className="opacity-50" />
+               <ZapOff size={20} className="opacity-50" />
                Wait...
              </>
            ) : (
              <>
-               <Zap size={24} fill="currentColor" className="group-hover:rotate-12 transition-transform" />
+               <Zap size={20} fill="currentColor" className="group-hover:rotate-12 transition-transform" />
                {settings.adsEnabled ? 'Watch Video' : 'Claim Reward'}
-               <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
+               <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
              </>
            )}
         </button>
 
-        <div className="grid grid-cols-2 gap-4">
-           <div className="bg-gray-50 dark:bg-gray-800/80 p-5 rounded-[28px] border border-gray-100 dark:border-gray-700 text-center space-y-1">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Reward</p>
+        <div className="grid grid-cols-2 gap-3">
+           <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 text-center space-y-0.5">
+              <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Reward</p>
               <div className="flex items-center justify-center gap-1">
-                 <span className="text-sm font-black text-gray-900 dark:text-white">{(AD_REWARD_COINS).toFixed(2)}</span>
-                 <Coins size={12} className="text-yellow-500" />
+                 <span className="text-xs font-black text-gray-900 dark:text-white">{(AD_REWARD_COINS).toFixed(2)}</span>
+                 <Coins size={10} className="text-yellow-500" />
               </div>
            </div>
-           <div className="bg-gray-50 dark:bg-gray-800/80 p-5 rounded-[28px] border border-gray-100 dark:border-gray-700 text-center space-y-1">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Network</p>
+           <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 text-center space-y-0.5">
+              <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Network</p>
               <div className="flex items-center justify-center gap-1">
-                 <span className="text-sm font-black text-green-500 uppercase">Optimal</span>
+                 <span className="text-xs font-black text-green-500 uppercase">Optimal</span>
               </div>
            </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border-2 border-blue-50 dark:border-blue-900/30 shadow-lg relative z-10 flex items-start gap-4">
-         <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
-            <ShieldCheck size={24} />
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border-2 border-blue-50 dark:border-blue-900/30 shadow-md relative z-10 flex items-start gap-3">
+         <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+            <ShieldCheck size={20} />
          </div>
-         <div className="space-y-1">
-            <h4 className="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-tight">Earning Tips</h4>
-            <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-relaxed tracking-widest">
-              Do not use VPN. Ensure you have a stable internet connection to receive coins instantly.
+         <div className="space-y-0.5">
+            <h4 className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-tight">Earning Tips</h4>
+            <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-relaxed tracking-widest">
+              Do not use VPN. Ensure stable internet connection for instant rewards.
             </p>
          </div>
       </div>

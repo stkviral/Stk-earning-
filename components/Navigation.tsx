@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase } from 'lucide-react';
+import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -11,6 +11,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'mining', icon: Pickaxe, label: 'Mining' },
+    { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
     { id: 'videos', icon: PlayCircle, label: 'Videos' },
     { id: 'wallet', icon: Wallet, label: 'Wallet' },
   ];

@@ -63,56 +63,57 @@ const Referral: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-700 pb-32 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="p-4 space-y-4 animate-in fade-in duration-700 pb-28 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
       
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-indigo-500/5 blur-[120px] pointer-events-none rounded-full" />
 
-      <div className="text-center space-y-2 pt-4 relative z-10">
-        <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight italic leading-tight">Invite & Earn</h1>
-        <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">Share with friends and earn together</p>
+      <div className="text-center space-y-1 pt-4 relative z-10">
+        <h1 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight italic leading-tight">Invite & Earn</h1>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">Share with friends and earn together</p>
       </div>
 
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[56px] p-10 text-center text-white shadow-2xl relative overflow-hidden group">
+      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[28px] p-5 text-center text-white shadow-xl relative overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 animate-shimmer-wave" />
         <div className="relative z-10">
-          <div className="w-24 h-24 bg-white/20 backdrop-blur-xl rounded-[36px] flex items-center justify-center mx-auto mb-6 shadow-2xl border border-white/20">
-            <Gift size={48} className="text-yellow-300 animate-float" />
+          <div className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-[24px] flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/20">
+            <Gift size={32} className="text-yellow-300 animate-float" />
           </div>
-          <h2 className="text-3xl font-black mb-2 uppercase italic tracking-tighter">Bonus: {settings.referralReward} STK</h2>
-          <p className="text-indigo-100 text-xs font-black uppercase tracking-[0.2em] opacity-80 mb-8 leading-relaxed">
+          <h2 className="text-xl font-black mb-1 uppercase italic tracking-tighter">Bonus: {settings.referralReward} STK</h2>
+          <p className="text-indigo-100 text-[9px] font-black uppercase tracking-[0.2em] opacity-80 mb-6 leading-relaxed">
             Per friend who completes their first withdrawal
           </p>
           
-          <div className="space-y-4">
-             <div className="bg-black/20 backdrop-blur-2xl p-6 rounded-[32px] border border-white/10 space-y-3">
-                <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest">Personal Code</p>
-                <div className="flex items-center gap-3">
-                   <div className="flex-1 bg-white/10 p-4 rounded-2xl text-2xl font-black tracking-[0.4em] text-center border border-white/10">{currentUser.referralCode}</div>
-                   <button onClick={copyCode} className="p-4 bg-white text-indigo-900 rounded-2xl active:scale-95 shadow-xl"><Copy size={24} /></button>
+          <div className="space-y-3">
+             <div className="bg-black/20 backdrop-blur-2xl p-4 rounded-2xl border border-white/10 space-y-2">
+                <p className="text-[8px] font-black text-indigo-200 uppercase tracking-widest">Personal Code</p>
+                <div className="flex items-center gap-2">
+                   <div className="flex-1 bg-white/10 p-3 rounded-xl text-xl font-black tracking-[0.4em] text-center border border-white/10">{currentUser.referralCode}</div>
+                   <button onClick={copyCode} className="p-3 bg-white text-indigo-900 rounded-xl active:scale-95 shadow-lg"><Copy size={18} /></button>
                 </div>
              </div>
-             <button className="w-full bg-white text-indigo-900 py-6 rounded-[32px] font-black text-lg uppercase tracking-widest shadow-2xl active:scale-95 transition-all border-b-8 border-indigo-100">
-               <Share2 size={24} /> INVITE FRIENDS
+             <button className="w-full bg-white text-indigo-900 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all border-b-4 border-indigo-100 flex items-center justify-center gap-2">
+               <Share2 size={18} /> INVITE FRIENDS
              </button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-         <div className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border-2 border-gray-50 dark:border-gray-800 text-center shadow-xl space-y-2">
-            <p className="text-[9px] font-black text-gray-400 uppercase">Yield</p>
-            <p className="text-xl font-black text-indigo-600">{animatedEarned} STK</p>
+      <div className="grid grid-cols-2 gap-3">
+         <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border-2 border-gray-50 dark:border-gray-800 text-center shadow-md space-y-1">
+            <p className="text-[8px] font-black text-gray-400 uppercase">Yield</p>
+            <p className="text-lg font-black text-indigo-600">{animatedEarned} STK</p>
          </div>
-         <div className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border-2 border-gray-50 dark:border-gray-800 text-center shadow-xl space-y-2">
-            <p className="text-[9px] font-black text-gray-400 uppercase">Growth</p>
-            <p className="text-xl font-black text-green-600">{totalReferrals} New</p>
+         <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border-2 border-gray-50 dark:border-gray-800 text-center shadow-md space-y-1">
+            <p className="text-[8px] font-black text-gray-400 uppercase">Growth</p>
+            <p className="text-lg font-black text-green-600">{totalReferrals} New</p>
          </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 p-8 rounded-[48px] border-2 border-indigo-50 dark:border-indigo-900/30 shadow-xl space-y-4">
-         <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">Rules</h4>
-         <p className="text-[10px] font-bold text-gray-400 uppercase leading-relaxed tracking-wider">Rewards are added instantly when your friend completes their first withdrawal. Fake accounts will be banned.</p>
+      <div className="bg-white dark:bg-gray-900 p-5 rounded-[32px] border-2 border-indigo-50 dark:border-indigo-900/30 shadow-md space-y-2">
+         <h4 className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">Rules</h4>
+         <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed tracking-wider">Rewards are added instantly when your friend completes their first withdrawal. Fake accounts will be banned.</p>
       </div>
+    </div>
     </div>
   );
 };

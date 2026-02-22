@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-1000 relative overflow-hidden bg-gray-50 dark:bg-gray-950 pb-40 min-h-full">
+    <div className="p-4 space-y-6 animate-in fade-in duration-1000 relative overflow-hidden bg-gray-50 dark:bg-gray-950 pb-32 min-h-full">
       <TechGrid />
       {[...Array(12)].map((_, i) => <FloatingParticle key={i} index={i} />)}
 
@@ -98,7 +98,7 @@ const Dashboard: React.FC = () => {
                <Terminal size={12} className="text-blue-500" />
                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.4em] italic">{greeting.text}</span>
             </div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none">
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none">
               Dashboard
             </h1>
           </div>
@@ -114,7 +114,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Cinematic Asset Vault Card */}
-        <div className="relative group overflow-hidden rounded-[48px] shadow-3xl transition-all duration-700 border border-white/20 dark:border-white/5">
+        <div className="relative group overflow-hidden rounded-[32px] shadow-3xl transition-all duration-700 border border-white/20 dark:border-white/5">
            <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-blue-950 to-indigo-950" />
            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
            <div className="absolute inset-0 w-full h-[1px] bg-blue-500/40 animate-holo-scan z-20 pointer-events-none shadow-[0_0_15px_#3b82f6]" />
@@ -126,8 +126,8 @@ const Dashboard: React.FC = () => {
                     <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.5em] opacity-80">Available Balance</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-sm font-black text-blue-400 italic">₹</span>
-                      <span className="text-6xl font-black text-white tracking-tighter italic tabular-nums leading-none">
-                        {(currentUser.coins * COIN_TO_INR_RATE).toFixed(0)}<span className="text-2xl opacity-30">.{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2).split('.')[1]}</span>
+                      <span className="text-5xl font-black text-white tracking-tighter italic tabular-nums leading-none">
+                        {(currentUser.coins * COIN_TO_INR_RATE).toFixed(0)}<span className="text-xl opacity-30">.{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2).split('.')[1]}</span>
                       </span>
                     </div>
                   </div>
@@ -257,7 +257,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* 4. Secondary Services (Quick Grid) */}
-      <div className="space-y-4 relative z-10">
+      <div className="grid grid-cols-1 gap-4 relative z-10">
          <div 
           onClick={() => setActiveTab('videos')}
           className="bg-white dark:bg-gray-900 p-8 rounded-[48px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
@@ -269,6 +269,24 @@ const Dashboard: React.FC = () => {
               <div className="space-y-1">
                 <span className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Watch & Earn</span>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Instant STK Rewards</p>
+              </div>
+            </div>
+            <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-gray-400">
+               <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
+            </div>
+         </div>
+
+         <div 
+          onClick={() => setActiveTab('tasks')}
+          className="bg-white dark:bg-gray-900 p-8 rounded-[48px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
+         >
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:scale-110 transition-transform">
+                 <CheckSquare size={36} className="text-white" />
+              </div>
+              <div className="space-y-1">
+                <span className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Daily Tasks</span>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Extra Coin Missions</p>
               </div>
             </div>
             <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-gray-400">

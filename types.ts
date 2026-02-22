@@ -121,3 +121,9 @@ export const AD_GAP_MS = 30000;
 export const MIN_WITHDRAWAL_COINS = 500;
 export const MAX_DAILY_ADS = 20;
 export const AD_REWARD_COINS = 1;
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}

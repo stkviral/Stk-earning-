@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { 
-  User, UserTag, UserStatus, AppState, Transaction, 
+  User, UserTag, UserStatus, AppState, Transaction, Task,
   COIN_TO_INR_RATE, AppSettings, AdminLog
 } from './types';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +10,7 @@ import SpinWheel from './pages/SpinWheel';
 import Wallet from './pages/Wallet';
 import Referral from './pages/Referral';
 import Videos from './pages/Videos';
+import Tasks from './pages/Tasks';
 import AdminPanel from './pages/AdminPanel';
 import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -19,6 +20,7 @@ import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
 import { ShieldOff, RefreshCw, Server, Ban, UserCog } from 'lucide-react';
+import { BackendAI } from './geminiService';
 
 interface AppContextType {
   state: AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' };
@@ -26,6 +28,8 @@ interface AppContextType {
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
   addCoins: (amount: number, method: string) => boolean;
+  addTask: (title: string, reward: number) => void;
+  completeTask: (taskId: string, proof?: string) => Promise<boolean>;
   playAd: (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
@@ -102,6 +106,18 @@ const App: React.FC = () => {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onComplete: () => void } | null>(null);
 
+  const updateUser = useCallback((updates: Partial<User>) => {
+    setState(prev => {
+      if (!prev.currentUser) return prev;
+      const updatedUser = { ...prev.currentUser, ...updates, lastActiveAt: Date.now() };
+      return {
+        ...prev,
+        currentUser: updatedUser,
+        allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+      };
+    });
+  }, []);
+
   const checkAdBlocker = useCallback(async () => {
     let detected = false;
     const dummy = document.createElement('div');
@@ -146,6 +162,37 @@ const App: React.FC = () => {
     }
   }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp]);
 
+  // Task Synchronization Effect
+  useEffect(() => {
+    if (!state.currentUser || state.isAdminSession) return;
+    const user = state.currentUser;
+    const tasks = [...user.tasks];
+    let changed = false;
+
+    tasks.forEach(task => {
+      if (task.type === 'SYSTEM' && !task.completed) {
+        let newProgress = task.progress || 0;
+        if (task.id === 't1') newProgress = user.adsWatchedToday || 0;
+        if (task.id === 't2') newProgress = user.spinsToday || 0;
+        if (task.id === 't3') newProgress = user.referralHistory?.length || 0;
+
+        if (newProgress !== task.progress) {
+          task.progress = newProgress;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      updateUser({ tasks });
+    }
+  }, [
+    state.currentUser?.adsWatchedToday, 
+    state.currentUser?.spinsToday, 
+    state.currentUser?.referralHistory?.length,
+    updateUser
+  ]);
+
   useEffect(() => {
     checkAdBlocker();
     const interval = setInterval(checkAdBlocker, 30000);
@@ -163,22 +210,10 @@ const App: React.FC = () => {
     }
   }, [state]);
 
-  const updateUser = useCallback((updates: Partial<User>) => {
-    setState(prev => {
-      if (!prev.currentUser) return prev;
-      const updatedUser = { ...prev.currentUser, ...updates, lastActiveAt: Date.now() };
-      return {
-        ...prev,
-        currentUser: updatedUser,
-        allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
-      };
-    });
-  }, []);
-
   const updateLogo = (url: string) => setState(prev => ({ ...prev, logoUrl: url }));
   const updateSettings = (updates: Partial<AppSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...updates } }));
 
-  const addCoins = (amount: number, method: string): boolean => {
+  const addCoins = useCallback((amount: number, method: string): boolean => {
     if (!state.currentUser) return false;
     if (state.settings.adsEnabled && state.isAdBlockerActive) {
       alert("Reward Blocked: Please disable your ad-blocker to receive coins.");
@@ -208,7 +243,42 @@ const App: React.FC = () => {
       transactions: [transaction, ...state.currentUser.transactions]
     });
     return true;
-  };
+  }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
+
+  const addTask = useCallback((title: string, reward: number) => {
+    if (!state.currentUser) return;
+    const newTask: Task = {
+      id: Math.random().toString(36).substring(2, 9),
+      title,
+      reward,
+      type: 'CUSTOM',
+      completed: false
+    };
+    updateUser({ tasks: [...state.currentUser.tasks, newTask] });
+  }, [state.currentUser, updateUser]);
+
+  const completeTask = useCallback(async (taskId: string, proof?: string) => {
+    if (!state.currentUser) return false;
+    const task = state.currentUser.tasks.find(t => t.id === taskId);
+    if (!task) return false;
+
+    if (task.type === 'CUSTOM' && proof) {
+      const result = await BackendAI.verifyTaskProof(task, proof);
+      if (!result.success) {
+        alert(`Verification Failed: ${result.reason}`);
+        return false;
+      }
+    }
+
+    const success = addCoins(task.reward, `Task: ${task.title}`);
+    if (success) {
+      updateUser({
+        tasks: state.currentUser.tasks.map(t => t.id === taskId ? { ...t, completed: true, proof } : t)
+      });
+      return true;
+    }
+    return false;
+  }, [state.currentUser, addCoins, updateUser]);
 
   const playAd = (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
     if (!state.settings.adsEnabled) { onComplete(); return; }
@@ -241,7 +311,11 @@ const App: React.FC = () => {
         status: UserStatus.ACTIVE,
         walletFrozen: false,
         adsBlocked: false,
-        tasks: [],
+        tasks: [
+          { id: 't1', title: 'WATCH 5 ADS', reward: 10, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 5 },
+          { id: 't2', title: 'SPIN THE WHEEL 3 TIMES', reward: 15, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 3 },
+          { id: 't3', title: 'INVITE 1 FRIEND', reward: 50, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 1 }
+        ],
         transactions: [],
         referralHistory: [],
         passHistory: [],
@@ -259,7 +333,13 @@ const App: React.FC = () => {
     setActiveTab(isAdmin ? 'admin' : 'home');
   };
 
-  const logout = () => { setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); setActiveTab('home'); };
+  const logout = () => { 
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
+    setActiveTab('home'); 
+  };
   const toggleTheme = useCallback(() => {
     setState(prev => {
       const isVIP = prev.currentUser?.tag === UserTag.PASS;
@@ -401,6 +481,7 @@ const App: React.FC = () => {
     }
     if (activeTab === 'privacy') return <PrivacyPolicy />;
     if (activeTab === 'faq') return <FAQ />;
+    if (activeTab === 'tasks') return <Tasks />;
     switch (activeTab) {
       case 'home': return <Dashboard />;
       case 'mining': return <Mining />;
@@ -414,7 +495,7 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={{
-      state, updateUser, updateLogo, updateSettings, addCoins, playAd, login, logout, 
+      state, updateUser, updateLogo, updateSettings, addCoins, addTask, completeTask, playAd, login, logout, 
       toggleTheme, buyPass, withdraw, setActiveTab, calculateRiskScore: () => 0,
       checkAdBlocker, logAdminAction, adminActions
     }}>

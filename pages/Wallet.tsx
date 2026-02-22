@@ -194,7 +194,7 @@ const Wallet: React.FC = () => {
   }, [currentUser.transactions, filter]);
 
   return (
-    <div className="p-6 space-y-10 pb-40 animate-in fade-in duration-1000 bg-gray-50 dark:bg-gray-950 min-h-full overflow-hidden transition-colors">
+    <div className="p-4 space-y-6 pb-32 animate-in fade-in duration-1000 bg-gray-50 dark:bg-gray-950 min-h-full overflow-hidden transition-colors">
       
       <div className="absolute top-0 left-0 w-full h-[400px] bg-gradient-to-b from-blue-600/10 dark:from-blue-600/20 to-transparent pointer-events-none" />
       <div className="absolute top-[-20%] right-[-20%] w-[80%] h-[50%] bg-indigo-500/10 blur-[150px] rounded-full animate-pulse-slow pointer-events-none" />
@@ -205,7 +205,7 @@ const Wallet: React.FC = () => {
                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.4em] italic">Wallet Terminal</span>
             </div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none">Wallet</h1>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none">Wallet</h1>
          </div>
          <button 
            onClick={() => setActiveTab('faq')}
@@ -216,21 +216,21 @@ const Wallet: React.FC = () => {
       </div>
 
       <div className="relative group">
-        <div className="absolute inset-0 bg-blue-600 rounded-[48px] blur-[100px] opacity-10 group-hover:opacity-20 transition-opacity duration-1000" />
-        <div className="relative z-10 bg-gray-950 dark:bg-black p-8 rounded-[48px] border border-white/10 shadow-3xl overflow-hidden">
+        <div className="absolute inset-0 bg-blue-600 rounded-[32px] blur-[100px] opacity-10 group-hover:opacity-20 transition-opacity duration-1000" />
+        <div className="relative z-10 bg-gray-950 dark:bg-black p-6 rounded-[32px] border border-white/10 shadow-3xl overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
           <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-600/20 blur-[80px] rounded-full animate-pulse" />
           <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/20 blur-[80px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
           
-          <div className="relative z-20 space-y-12">
+          <div className="relative z-20 space-y-8">
             <div className="flex justify-between items-start">
               <div className="space-y-3">
                 <p className="text-[9px] font-black text-blue-300 uppercase tracking-[0.5em] opacity-60">Total Balance</p>
                 <div className="flex flex-col">
                   <div className="flex items-baseline gap-3">
                     <span className="text-sm font-black text-blue-400 italic">₹</span>
-                    <span className="text-6xl font-black text-white tracking-tighter italic tabular-nums leading-none">
-                      {currentBalanceINR.toFixed(0)}<span className="text-3xl opacity-30">.{currentBalanceINR.toFixed(2).split('.')[1]}</span>
+                    <span className="text-5xl font-black text-white tracking-tighter italic tabular-nums leading-none">
+                      {currentBalanceINR.toFixed(0)}<span className="text-2xl opacity-30">.{currentBalanceINR.toFixed(2).split('.')[1]}</span>
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-6">
@@ -375,14 +375,14 @@ const Wallet: React.FC = () => {
           <div className="bg-gray-950 p-8 rounded-[48px] border border-white/5 flex items-center justify-between shadow-3xl relative overflow-hidden">
              <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-blue-600/10 blur-[50px] rounded-full pointer-events-none" />
              <div className="space-y-1 relative z-10">
-                <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] italic">Total You Receive</p>
+                <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] italic">Net Payout</p>
                 <div className="flex items-baseline gap-2">
                    <span className="text-sm font-black text-blue-500 italic">₹</span>
                    <span className="text-5xl font-black text-white italic tracking-tighter tabular-nums">{netINR.toFixed(2)}</span>
                 </div>
              </div>
              <div className="text-right relative z-10 bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
-                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Fee</p>
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Platform Fee</p>
                 <p className={`text-[11px] font-black uppercase tracking-tighter ${isPass ? 'text-green-500' : 'text-red-500'}`}>
                   {isPass ? 'FREE' : `-₹${feeINR.toFixed(1)}`}
                 </p>
@@ -472,13 +472,18 @@ const Wallet: React.FC = () => {
               
               <div className="space-y-5 border-b-2 border-dashed border-gray-200 dark:border-gray-700 pb-8">
                 <div className="flex justify-between items-center px-1">
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Base Session</p>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">STK Coins Deducted</p>
+                   <p className="text-lg font-black text-blue-600 dark:text-blue-400 tracking-tight tabular-nums">{numAmount.toLocaleString()} STK</p>
+                </div>
+
+                <div className="flex justify-between items-center px-1">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Gross Cash Value</p>
                    <p className="text-lg font-black text-gray-900 dark:text-white tracking-tight tabular-nums">₹{grossINR.toFixed(2)}</p>
                 </div>
                 
                 <div className="flex justify-between items-center px-1">
                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Processing</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Platform Fee</p>
                       {isPass && <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-[8px] font-black px-2 py-0.5 rounded-lg border border-green-200 dark:border-green-800 uppercase">WAIVED</span>}
                    </div>
                    <p className={`text-lg font-black ${isPass ? 'text-green-500' : 'text-red-500'} tracking-tight tabular-nums`}>
