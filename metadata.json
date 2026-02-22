@@ -1,0 +1,7 @@
+{
+  "name": "STK Earning App",
+  "description": "A comprehensive earning platform where users can collect coins through mining, spinning, and watching ads, with a dedicated dashboard for withdrawal management and a monthly pass system.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

@@ -1,0 +1,276 @@
+
+import React, { useState, useRef } from 'react';
+import { useApp } from '../App';
+import { 
+  Disc, Trophy, Sparkles, Coins, Gift, Lock, 
+  Star, Zap, Loader2, ShieldCheck, Fingerprint, Activity,
+  ShieldOff, ShieldAlert, PlusCircle
+} from 'lucide-react';
+import { UserTag } from '../types';
+import { playSound } from '../audioUtils';
+
+const SpinWheel: React.FC = () => {
+  const { state, playAd, addCoins, updateUser, setActiveTab } = useApp();
+  const { currentUser, settings, isAdBlockerActive } = state;
+  const [spinning, setSpinning] = useState(false);
+  const [isWobbling, setIsWobbling] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [lastReward, setLastReward] = useState<number | null>(null);
+  const [winningSegmentIndex, setWinningSegmentIndex] = useState<number | null>(null);
+  const [isAdPending, setIsAdPending] = useState(false);
+  const wheelRef = useRef<HTMLDivElement>(null);
+
+  if (!currentUser) return null;
+
+  if (!settings.spinEnabled) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[500px] text-center space-y-6">
+        <div className="w-24 h-24 bg-gray-100 dark:bg-gray-900 rounded-[32px] flex items-center justify-center">
+           <Lock size={64} className="text-gray-300 dark:text-gray-700" />
+        </div>
+        <div className="space-y-2">
+           <h2 className="text-3xl font-black uppercase italic tracking-tighter dark:text-white">Spin Wheel Offline</h2>
+           <p className="text-xs text-gray-500 font-bold uppercase tracking-widest max-w-[240px] leading-relaxed">The prize wheel system is currently under maintenance.</p>
+        </div>
+        <button onClick={() => setActiveTab('home')} className="bg-blue-600 text-white px-10 py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl transition-all border-b-4 border-blue-900">Return to Terminal</button>
+      </div>
+    );
+  }
+
+  const isUnlimited = currentUser.tag === UserTag.PASS;
+  const remainingSpins = settings.maxDailySpinsNormal - currentUser.spinsToday;
+
+  const handleSpin = async () => {
+    if (isAdBlockerActive) {
+      alert("Verification Failed: Please disable your ad-blocker.");
+      return;
+    }
+
+    if (!isUnlimited && remainingSpins <= 0) {
+      alert("No spins left! Watch an ad to unlock one extra turn or wait for tomorrow.");
+      return;
+    }
+
+    if (spinning || isWobbling || isAdPending) return;
+
+    playSound('tap');
+    setLastReward(null);
+    setWinningSegmentIndex(null);
+    setIsWobbling(true);
+
+    setTimeout(() => {
+      setIsWobbling(false);
+      setSpinning(true);
+      playSound('ignite');
+      
+      const segmentIndex = Math.floor(Math.random() * settings.spinRewards.length);
+      const segmentAngle = 360 / settings.spinRewards.length;
+      const extraRotations = 10 * 360; 
+      const currentAngleOffset = rotation % 360;
+      const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2);
+      const newRotation = rotation + extraRotations + (finalSegmentAngle - currentAngleOffset);
+      
+      setRotation(newRotation);
+
+      // Wheel stops
+      setTimeout(() => {
+        setSpinning(false);
+        playSound('complete');
+        setIsAdPending(true);
+        
+        // MANDATORY AD AFTER EVERY SPIN
+        playAd(() => {
+          setWinningSegmentIndex(segmentIndex);
+          setLastReward(settings.spinRewards[segmentIndex]);
+          setIsAdPending(false);
+        }, 'REQUIRED');
+        
+      }, 4000); 
+    }, 600);
+  };
+
+  const handleClaimReward = () => {
+    if (lastReward === null || isAdBlockerActive || isAdPending) return;
+
+    setIsAdPending(true);
+    // MANDATORY AD BEFORE EVERY CLAIM
+    playAd(() => {
+      const success = addCoins(lastReward!, 'Lucky Spin');
+      if (success) {
+        playSound('collect');
+        updateUser({ spinsToday: currentUser.spinsToday + 1 });
+      }
+      setLastReward(null);
+      setWinningSegmentIndex(null);
+      setIsAdPending(false);
+    }, 'REQUIRED');
+  };
+
+  const handleUnlockExtraSpin = () => {
+    if (currentUser.extraSpinWatchedToday || isAdBlockerActive || isAdPending) return;
+    
+    setIsAdPending(true);
+    playAd(() => {
+      // Logic: Decrease spinsToday to effectively give 1 more spin
+      updateUser({ 
+        spinsToday: Math.max(0, currentUser.spinsToday - 1),
+        extraSpinWatchedToday: true 
+      });
+      setIsAdPending(false);
+      playSound('complete');
+      alert("Extra turn unlocked! Use it now.");
+    }, 'REQUIRED');
+  };
+
+  return (
+    <div className="p-6 space-y-12 flex flex-col items-center min-h-full pb-36 bg-gray-50 dark:bg-gray-950 transition-colors duration-500 overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-blue-600/10 dark:from-blue-600/20 to-transparent pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.1)_0,transparent_70%)] pointer-events-none" />
+
+      <div className="text-center space-y-3 pt-4 relative z-10">
+        <h2 className={`text-5xl font-black tracking-tighter uppercase italic leading-none transition-colors duration-500 ${isAdBlockerActive ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>Lucky Spin</h2>
+        <div className="flex items-center justify-center gap-3">
+           <Sparkles size={14} className="text-orange-500 animate-pulse" />
+           <p className="text-[10px] text-gray-500 dark:text-gray-400 font-black uppercase tracking-[0.4em]">Spin & Win STK Coins</p>
+           <Sparkles size={14} className="text-orange-500 animate-pulse" />
+        </div>
+      </div>
+
+      <div className={`relative w-80 h-80 flex items-center justify-center shrink-0 z-10 ${isWobbling ? 'animate-wobble' : ''}`}>
+        {isAdBlockerActive && (
+          <div className="absolute inset-0 z-40 rounded-full bg-gray-950/80 backdrop-blur-md flex flex-col items-center justify-center border-4 border-red-600 animate-in fade-in zoom-in-95 duration-500 shadow-[0_0_50px_rgba(220,38,38,0.5)]">
+             <ShieldOff size={64} className="text-red-500 animate-pulse mb-4" />
+             <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Ad-Blocker Active</span>
+          </div>
+        )}
+
+        <div className={`absolute inset-0 rounded-full border-[14px] shadow-2xl flex items-center justify-center transition-all duration-700 ${isAdBlockerActive ? 'border-red-900 bg-red-950 grayscale' : 'border-blue-700 dark:border-blue-900 bg-blue-800 dark:bg-gray-900 shadow-blue-500/20'}`}>
+          {[...Array(24)].map((_, i) => (
+            <div key={i} className={`absolute w-2 h-2 rounded-full transition-all duration-300 ${spinning ? 'bg-white shadow-[0_0_15px_white] scale-125' : 'bg-white/40 shadow-sm'}`} style={{ transform: `rotate(${i * 15}deg) translateY(-136px)` }} />
+          ))}
+        </div>
+        
+        <div ref={wheelRef} className={`absolute inset-5 rounded-full border-4 border-white/20 shadow-2xl overflow-hidden transition-all duration-[4000ms] ease-[cubic-bezier(0.2,0,0.1,1)] ${isAdBlockerActive ? 'grayscale opacity-20' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
+          {settings.spinRewards.map((val, i) => {
+            const angle = 360 / settings.spinRewards.length;
+            const darkVibrantColors = ['#dc2626', '#d97706', '#059669', '#2563eb', '#4f46e5', '#7c3aed', '#c026d3', '#db2777'];
+            return (
+              <div key={i} className="absolute top-0 left-0 w-full h-full origin-center" style={{ transform: `rotate(${i * angle}deg)` }}>
+                <div className={`w-full h-full relative transition-all duration-500 ${winningSegmentIndex === i ? 'animate-segment-bounce' : ''}`}>
+                  <svg className="absolute w-full h-full" viewBox="0 0 100 100">
+                    <path d={`M50,50 L50,0 A50,50 0 0,1 ${50 + 50 * Math.sin(angle * Math.PI / 180)},${50 - 50 * Math.cos(angle * Math.PI / 180)} Z`} fill={darkVibrantColors[i % darkVibrantColors.length]} />
+                  </svg>
+                  <div className={`absolute top-10 left-1/2 -translate-x-1/2 font-black text-white text-2xl flex flex-col items-center drop-shadow-lg transition-transform ${winningSegmentIndex === i ? 'scale-150' : ''}`} style={{ transform: `rotate(${angle / 2}deg)` }}>
+                    <span>{val}</span>
+                    <Coins size={12} className="opacity-80 mt-1" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-5 z-50">
+          <div className={`w-8 h-12 rounded-b-2xl shadow-2xl border-x-2 border-b-2 border-white transition-colors ${isAdBlockerActive ? 'bg-red-600' : 'bg-blue-600 dark:bg-blue-500'}`} />
+          <div className={`w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[16px] mx-auto transition-colors ${isAdBlockerActive ? 'border-t-red-600' : 'border-t-blue-600 dark:border-t-blue-500'}`} />
+        </div>
+
+        <div className="relative z-50 w-24 h-24 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-3xl border-4 border-gray-100 dark:border-gray-700 transition-transform group hover:scale-105">
+           <div className={`absolute inset-2 border-2 border-dashed border-blue-500/20 rounded-full ${spinning ? 'animate-spin-slow' : ''}`} />
+           {isAdPending ? <Loader2 className="text-blue-600 animate-spin" size={32} /> : <Disc className={`text-blue-600 dark:text-blue-400 ${spinning ? 'animate-spin' : ''}`} size={32} />}
+        </div>
+      </div>
+
+      <div className="w-full max-w-xs space-y-6 relative z-10">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-[36px] border border-gray-100 dark:border-gray-800 flex justify-between items-center shadow-2xl relative overflow-hidden group">
+          <div className="absolute inset-0 bg-blue-600/5 dark:bg-blue-600/10 transition-opacity opacity-0 group-hover:opacity-100" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className={`w-12 h-12 rounded-[20px] flex items-center justify-center bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-800/50`}>
+              <Star size={24} fill="currentColor" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Turn Supply</p>
+              <p className="text-sm font-black text-gray-900 dark:text-white uppercase italic">{isUnlimited ? 'Elite Status' : 'Standard Yield'}</p>
+            </div>
+          </div>
+          <div className={`px-4 py-2 rounded-2xl text-[11px] font-black shadow-lg transition-all ${isUnlimited ? 'bg-yellow-400 text-blue-950 scale-105' : 'bg-blue-600 text-white'}`}>
+             {isUnlimited ? 'VIP' : `${remainingSpins} LEFT`}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <button 
+            onClick={handleSpin}
+            disabled={spinning || isWobbling || (!isUnlimited && remainingSpins <= 0) || isAdBlockerActive || isAdPending}
+            className={`w-full py-7 rounded-[36px] font-black text-2xl shadow-3xl transition-all flex items-center justify-center gap-4 relative overflow-hidden group border-b-[10px] active:scale-95 ${isAdBlockerActive || isAdPending || (!isUnlimited && remainingSpins <= 0) ? 'bg-gray-200 border-gray-400 opacity-40 grayscale text-gray-400' : 'bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-900 text-white border-blue-900 shadow-blue-500/30'}`}
+          >
+            {spinning || isAdPending ? <Loader2 className="animate-spin" size={28} /> : (
+              <>
+                <Zap size={28} fill="currentColor" className="group-hover:scale-125 transition-transform" />
+                SPIN NOW
+              </>
+            )}
+          </button>
+
+          {!isUnlimited && remainingSpins <= 0 && !currentUser.extraSpinWatchedToday && (
+             <button 
+               onClick={handleUnlockExtraSpin}
+               disabled={isAdPending || isAdBlockerActive}
+               className="w-full py-4 bg-white dark:bg-gray-900 border-2 border-blue-100 dark:border-blue-900 rounded-[28px] text-blue-600 dark:text-blue-400 font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl"
+             >
+                <PlusCircle size={18} /> Restore 1 Energy
+             </button>
+          )}
+        </div>
+      </div>
+
+      {lastReward !== null && !spinning && (
+        <div className="fixed inset-0 bg-gray-950/98 backdrop-blur-3xl flex items-center justify-center p-6 z-[200] animate-in fade-in duration-500">
+          <div className="bg-white dark:bg-gray-900 rounded-[64px] p-12 w-full max-w-sm text-center shadow-[0_0_80px_rgba(0,0,0,0.5)] relative overflow-hidden animate-in zoom-in-95 duration-500 border-2 border-white/10 dark:border-gray-800">
+            <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 via-indigo-500 to-purple-500" />
+            
+            <div className="relative mb-10">
+               <div className="absolute inset-0 bg-yellow-400 blur-3xl opacity-30 animate-pulse" />
+               <div className="w-28 h-28 bg-gradient-to-tr from-yellow-400 to-orange-600 rounded-[40px] flex items-center justify-center mx-auto relative z-10 shadow-3xl border-4 border-white dark:border-gray-800 rotate-6 transition-transform hover:rotate-12">
+                 <Trophy size={56} className="text-white animate-bounce" />
+               </div>
+            </div>
+
+            <h3 className="text-4xl font-black text-gray-900 dark:text-white mb-2 tracking-tighter uppercase italic">Jackpot!</h3>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mb-8">Quantum disbursement ready</p>
+
+            <div className="bg-gray-50 dark:bg-black/50 rounded-[48px] py-10 px-6 my-10 border-2 border-gray-100 dark:border-gray-800 shadow-inner flex flex-col items-center justify-center gap-2">
+               <div className="flex items-center gap-4">
+                  <Coins className="text-yellow-500 animate-pulse" size={44} />
+                  <span className="text-7xl font-black text-gray-900 dark:text-white tracking-tighter tabular-nums italic">{lastReward}</span>
+               </div>
+               <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest mt-2">COINS WON</span>
+            </div>
+
+            <div className="space-y-4">
+              <button 
+                onClick={handleClaimReward}
+                disabled={isAdPending}
+                className={`w-full py-7 rounded-[32px] font-black text-2xl shadow-3xl flex items-center justify-center gap-4 transition-all bg-green-600 text-white border-b-[10px] border-green-900 active:scale-95 shadow-green-500/30 ${isAdPending ? 'opacity-50 grayscale' : ''}`}
+              >
+                {isAdPending ? <Loader2 className="animate-spin" /> : <><Gift size={28} /> CLAIM COINS</>}
+              </button>
+              <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center flex items-center justify-center gap-2">
+                <ShieldCheck size={12} className="text-blue-500" />
+                Auth Verification Required
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-4 mt-10 opacity-30 grayscale">
+               <ShieldCheck size={16} />
+               <Fingerprint size={16} />
+               <Activity size={16} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SpinWheel;

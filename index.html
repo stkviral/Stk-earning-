@@ -1,0 +1,193 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>STK Earning App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'spin-slow': 'spin 12s linear infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'mesh': 'mesh 15s ease infinite',
+              'shimmer-wave': 'shimmer-wave 2.5s infinite linear',
+              'heat-haze': 'heat-haze 2s ease-in-out infinite',
+              'plasma-glow': 'plasma-glow 3s ease-in-out infinite',
+              'holo-scan': 'holo-scan 4s linear infinite',
+              'float-particle': 'float-particle 10s linear infinite',
+              'wobble': 'wobble 0.15s ease-in-out infinite',
+              'segment-bounce': 'segment-bounce 0.6s ease-in-out infinite',
+              'spark': 'spark 0.8s ease-out forwards',
+            },
+            colors: {
+              gray: {
+                950: '#030712',
+                1000: '#010409', // Deepest black for OLED
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      /* Unified smooth transitions for UI interactions */
+      *, *::before, *::after {
+        transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    background-color 0.4s ease,
+                    border-color 0.4s ease;
+      }
+
+      /* Exclude animations from slow transitions to prevent lag */
+      .animate-pickaxe, .animate-liquid, .animate-shimmer-fast, .animate-marquee, 
+      .animate-shake, .animate-glimmer, .animate-spin-slow, .animate-energy-pulse, 
+      .animate-fire-glow, .animate-glitter-star, .animate-float, .animate-coin-pop, 
+      .animate-mesh, .animate-shimmer-wave, .animate-glitch-active, .animate-wobble, 
+      .animate-segment-bounce, .animate-balance-bump, .animate-heat-haze, .animate-plasma-glow,
+      .animate-holo-scan, .animate-float-particle, .animate-spark {
+        transition: none !important;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+
+      .dark body {
+        background-color: #030712;
+        color: #f9fafb;
+      }
+      
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .scrollbar-custom::-webkit-scrollbar {
+        width: 4px;
+      }
+      .scrollbar-custom::-webkit-scrollbar-track {
+        background: #111827;
+      }
+      .scrollbar-custom::-webkit-scrollbar-thumb {
+        background: #374151;
+        border-radius: 10px;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-20px); }
+      }
+
+      @keyframes shimmer-wave {
+        0% { transform: translateX(-150%) skewX(-20deg); }
+        100% { transform: translateX(250%) skewX(-20deg); }
+      }
+
+      @keyframes heat-haze {
+        0%, 100% { transform: scale(1) skewX(0deg); filter: blur(0px) contrast(1); }
+        25% { transform: scale(1.02) skewX(1deg); filter: blur(0.5px) contrast(1.1); }
+        75% { transform: scale(1.01) skewX(-1deg); filter: blur(0.3px) contrast(1.05); }
+      }
+
+      @keyframes plasma-glow {
+        0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.4), inset 0 0 10px rgba(249, 115, 22, 0.2); }
+        50% { box-shadow: 0 0 50px rgba(239, 68, 68, 0.6), inset 0 0 25px rgba(239, 68, 68, 0.3); }
+      }
+
+      @keyframes holo-scan {
+        0% { top: -100%; opacity: 0; }
+        10% { opacity: 0.5; }
+        90% { opacity: 0.5; }
+        100% { top: 100%; opacity: 0; }
+      }
+
+      @keyframes float-particle {
+        0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+        20% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { transform: translateY(-100vh) translateX(50px) scale(0.5); opacity: 0; }
+      }
+
+      @keyframes pickaxe-swing {
+        0% { transform: rotate(0deg); }
+        30% { transform: rotate(-45deg); }
+        40% { transform: rotate(25deg); }
+        100% { transform: rotate(0deg); }
+      }
+      .animate-pickaxe {
+        animation: pickaxe-swing 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        transform-origin: bottom right;
+      }
+
+      @keyframes balance-bump {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); color: #fbbf24; }
+      }
+      .animate-balance-bump {
+        animation: balance-bump 0.3s ease-out;
+      }
+
+      @keyframes glitch-active {
+        0% { transform: translate(0); filter: drop-shadow(2px 0 #ef4444) drop-shadow(-2px 0 #3b82f6); opacity: 1; }
+        20% { transform: translate(-4px, 2px) skewX(5deg); opacity: 0.8; }
+        100% { transform: translate(0); }
+      }
+      .animate-glitch-active {
+        animation: glitch-active 0.12s steps(2, end) infinite;
+      }
+
+      @keyframes orbit-ccw {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(-360deg); }
+      }
+      .animate-orbit-ccw {
+        animation: orbit-ccw 10s linear infinite;
+      }
+
+      @keyframes wobble {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-2deg); }
+        75% { transform: rotate(2deg); }
+      }
+
+      @keyframes segment-bounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); filter: brightness(1.2) drop-shadow(0 0 10px rgba(255,255,255,0.4)); }
+      }
+
+      @keyframes spark {
+        0% { transform: translate(0, 0) scale(1); opacity: 1; }
+        100% { transform: var(--tw-translate-x) var(--tw-translate-y) scale(0); opacity: 0; }
+      }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "react/": "https://esm.sh/react@^19.2.4/",
+        "react": "https://esm.sh/react@^19.2.4",
+        "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+        "@google/genai": "https://esm.sh/@google/genai@^1.39.0"
+      }
+    }
+    </script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
