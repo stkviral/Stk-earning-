@@ -5,9 +5,10 @@ import { useApp } from '../App';
 
 interface LoginProps {
   onLogin: (email: string, name: string, referralCode?: string) => void;
+  onAdminClick: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onAdminClick }) => {
   const [referralCode, setReferralCode] = useState('');
   const { state } = useApp();
 
@@ -17,7 +18,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 dark:bg-blue-600/20 rounded-full blur-[100px] -mr-32 -mt-32 opacity-80" />
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 dark:bg-indigo-600/15 rounded-full blur-[80px] -ml-24 -mb-24 opacity-60" />
       
-      <div className="relative z-10 w-40 h-40 mb-10 group">
+      <div className="relative z-10 w-40 h-40 mb-10 group" onClick={(e) => {
+        if (e.detail === 5) onAdminClick(); // Secret 5-click on logo
+      }}>
         <div className="absolute inset-0 bg-blue-600 rounded-[48px] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
         <div className="w-full h-full relative z-10 bg-white dark:bg-gray-900 rounded-[48px] shadow-2xl border-b-8 border-blue-600 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 duration-500">
           <img 
@@ -60,14 +63,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
             Login with Google
           </button>
-
-          <button 
-            onClick={() => onLogin('admin@stk.com', 'Super Admin')}
-            className="w-full flex items-center justify-center gap-3 bg-gray-900 dark:bg-white py-5 rounded-[28px] font-black text-white dark:text-gray-900 hover:opacity-90 transition-all shadow-2xl active:scale-95 uppercase text-xs border-b-4 border-black dark:border-gray-300"
-          >
-            <ShieldAlert size={18} className="text-red-500 dark:text-red-600" />
-            Login as Admin
-          </button>
         </div>
       </div>
 
@@ -78,7 +73,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Secure & Encrypted
           </p>
         </div>
-        <p className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest">STK NETWORK v2.4.0</p>
+        <button 
+          onClick={onAdminClick}
+          className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest hover:text-blue-500 transition-colors"
+        >
+          STK NETWORK v2.4.0
+        </button>
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel';
 import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
+import AdminLogin from './pages/AdminLogin';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
@@ -98,6 +99,7 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState('home');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onComplete: () => void } | null>(null);
 
   const checkAdBlocker = useCallback(async () => {
@@ -367,7 +369,10 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!state.isLoggedIn) return <Login onLogin={login} />;
+    if (!state.isLoggedIn) {
+      if (showAdminLogin) return <AdminLogin onLogin={login} onBack={() => setShowAdminLogin(false)} />;
+      return <Login onLogin={login} onAdminClick={() => setShowAdminLogin(true)} />;
+    }
     if (state.currentUser?.status === UserStatus.BANNED && !state.isAdminSession) {
       return (
         <div className="flex flex-col h-full items-center justify-center p-8 text-center space-y-6">
@@ -387,7 +392,13 @@ const App: React.FC = () => {
         </div>
       );
     }
-    if (activeTab === 'admin') return <AdminPanel />;
+    if (activeTab === 'admin') {
+      if (!state.isAdminSession) {
+        setActiveTab('home');
+        return <Dashboard />;
+      }
+      return <AdminPanel />;
+    }
     if (activeTab === 'privacy') return <PrivacyPolicy />;
     if (activeTab === 'faq') return <FAQ />;
     switch (activeTab) {
