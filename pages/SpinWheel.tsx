@@ -10,7 +10,7 @@ import { UserTag } from '../types';
 import { playSound } from '../audioUtils';
 
 const SpinWheel: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, setActiveTab } = useApp();
+  const { state, playAd, addCoins, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, settings, isAdBlockerActive } = state;
   const [spinning, setSpinning] = useState(false);
   const [isWobbling, setIsWobbling] = useState(false);
@@ -83,6 +83,7 @@ const SpinWheel: React.FC = () => {
           setWinningSegmentIndex(segmentIndex);
           setLastReward(settings.spinRewards[segmentIndex]);
           setIsAdPending(false);
+          logActivity(currentUser.id, currentUser.name, 'SPIN_RESULT', `Won ${settings.spinRewards[segmentIndex]} coins from wheel`);
         }, 'REQUIRED');
         
       }, 4000); 
@@ -99,9 +100,10 @@ const SpinWheel: React.FC = () => {
       if (success) {
         playSound('collect');
         updateUser({ spinsToday: currentUser.spinsToday + 1 });
+        logActivity(currentUser.id, currentUser.name, 'SPIN_CLAIM', `Claimed ${lastReward} coins from spin`);
+        setLastReward(null);
+        setWinningSegmentIndex(null);
       }
-      setLastReward(null);
-      setWinningSegmentIndex(null);
       setIsAdPending(false);
     }, 'REQUIRED');
   };

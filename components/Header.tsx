@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../App';
-import { Wallet, Crown, ShieldAlert, LogOut, Settings, Zap, Coins, HelpCircle, Clock, Sun, Moon, Activity, Sparkles } from 'lucide-react';
-import { UserTag, COIN_TO_INR_RATE } from '../types';
+import { Wallet, Crown, ShieldAlert, LogOut, Settings, Zap, Coins, HelpCircle, Clock, Sun, Moon, Activity, Sparkles, ShieldCheck } from 'lucide-react';
+import { UserTag, COIN_TO_INR_RATE, ADMIN_EMAIL } from '../types';
 import { playSound } from '../audioUtils';
 
 const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
@@ -135,6 +135,14 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           )}
 
           <div className="flex items-center bg-gray-50 dark:bg-white/5 p-1 rounded-2xl border border-gray-100 dark:border-white/5">
+            {currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (
+              <button 
+                onClick={() => { playSound('tap'); setActiveTab('admin'); }}
+                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-blue-600 dark:text-blue-400"
+              >
+                <ShieldCheck size={22} />
+              </button>
+            )}
             {!isAdmin && (
               <button 
                 onClick={() => { playSound('tap'); setActiveTab('faq'); }}

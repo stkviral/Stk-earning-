@@ -40,6 +40,15 @@ export interface AdminLog {
   timestamp: number;
 }
 
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -113,6 +122,7 @@ export interface AppState {
   logoUrl: string;
   settings: AppSettings;
   logs: AdminLog[];
+  activityLogs: ActivityLog[];
 }
 
 export const COIN_TO_INR_RATE = 10 / 100;
@@ -121,6 +131,7 @@ export const AD_GAP_MS = 30000;
 export const MIN_WITHDRAWAL_COINS = 500;
 export const MAX_DAILY_ADS = 20;
 export const AD_REWARD_COINS = 1;
+export const ADMIN_EMAIL = 'admin@stk.com';
 
 declare global {
   interface Window {

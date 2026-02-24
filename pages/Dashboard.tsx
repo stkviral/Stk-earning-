@@ -35,7 +35,7 @@ const FloatingParticle: React.FC<{ index: number }> = ({ index }) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, buyPass, setActiveTab } = useApp();
+  const { state, playAd, addCoins, updateUser, buyPass, setActiveTab, logActivity } = useApp();
   const { currentUser, settings } = state;
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [showNotification, setShowNotification] = useState(true);
@@ -81,6 +81,7 @@ const Dashboard: React.FC = () => {
       const success = addCoins(settings.dailyBonusReward, 'Daily Bonus');
       if (success) {
         updateUser({ dailyRewardClaimed: true, lastResetTimestamp: Date.now() });
+        logActivity(currentUser.id, currentUser.name, 'DAILY_BONUS', `Claimed ${settings.dailyBonusReward} coins`);
       }
     }, 'REQUIRED');
   };
@@ -119,7 +120,7 @@ const Dashboard: React.FC = () => {
            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
            <div className="absolute inset-0 w-full h-[1px] bg-blue-500/40 animate-holo-scan z-20 pointer-events-none shadow-[0_0_15px_#3b82f6]" />
            
-           <div className="relative z-10 p-8 space-y-10">
+           <div className="relative z-10 p-6 space-y-8">
               <div className="flex justify-between items-start">
                 <div className="space-y-4">
                   <div className="space-y-0.5">
@@ -180,7 +181,7 @@ const Dashboard: React.FC = () => {
         {/* EXTRACTION HUB (MINING) */}
         <div 
           onClick={() => { playSound('tap'); setActiveTab('mining'); }}
-          className={`group bg-white dark:bg-gray-900 rounded-[44px] p-8 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-5 active:scale-95 transition-all relative overflow-hidden`}
+          className="group bg-white dark:bg-gray-900 rounded-[44px] p-6 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
         >
           <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.03] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700 pointer-events-none">
              <Pickaxe size={180} />
@@ -203,7 +204,7 @@ const Dashboard: React.FC = () => {
         {/* FORTUNE HUB (SPIN) */}
         <div 
           onClick={() => { playSound('tap'); setActiveTab('spin'); }}
-          className="group bg-white dark:bg-gray-900 rounded-[44px] p-8 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-5 active:scale-95 transition-all relative overflow-hidden"
+          className="group bg-white dark:bg-gray-900 rounded-[44px] p-6 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
         >
           <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.03] group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-700 pointer-events-none">
              <Disc size={180} />
@@ -227,7 +228,7 @@ const Dashboard: React.FC = () => {
       {/* 3. Daily Bonus Section (Guided Action) */}
       <div 
         onClick={handleClaimDailyBonus}
-        className={`relative z-10 p-8 rounded-[48px] border-2 transition-all active:scale-[0.98] group overflow-hidden ${
+        className={`relative z-10 p-6 rounded-[40px] border-2 transition-all active:scale-[0.98] group overflow-hidden ${
           currentUser.dailyRewardClaimed 
           ? 'bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 opacity-60' 
           : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-500/30 shadow-2xl'
@@ -260,7 +261,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 relative z-10">
          <div 
           onClick={() => setActiveTab('videos')}
-          className="bg-white dark:bg-gray-900 p-8 rounded-[48px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
+          className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
          >
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-red-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-red-500/20 group-hover:scale-110 transition-transform">
@@ -278,7 +279,7 @@ const Dashboard: React.FC = () => {
 
          <div 
           onClick={() => setActiveTab('tasks')}
-          className="bg-white dark:bg-gray-900 p-8 rounded-[48px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
+          className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
          >
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-blue-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:scale-110 transition-transform">
@@ -352,6 +353,13 @@ const Dashboard: React.FC = () => {
            <button onClick={() => setShowNotification(false)} className="p-2 hover:bg-white/20 rounded-xl transition-all"><X size={16} /></button>
         </div>
       )}
+
+      {/* App Version */}
+      <div className="pt-10 pb-4 text-center">
+        <p className="text-[9px] font-black text-gray-300 dark:text-gray-800 uppercase tracking-[0.5em] cursor-default select-none">
+          STK Network v{settings.appVersion}
+        </p>
+      </div>
     </div>
   );
 };

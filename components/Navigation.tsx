@@ -1,6 +1,8 @@
 
-import React from 'react';
-import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare, ShieldCheck } from 'lucide-react';
+import { useApp } from '../App';
+import { ADMIN_EMAIL } from '../types';
 
 interface NavigationProps {
   activeTab: string;
@@ -8,13 +10,23 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
-  const tabs = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'mining', icon: Pickaxe, label: 'Mining' },
-    { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
-    { id: 'videos', icon: PlayCircle, label: 'Videos' },
-    { id: 'wallet', icon: Wallet, label: 'Wallet' },
-  ];
+  const { state } = useApp();
+  
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      { id: 'home', icon: Home, label: 'Home' },
+      { id: 'mining', icon: Pickaxe, label: 'Mining' },
+      { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
+      { id: 'videos', icon: PlayCircle, label: 'Videos' },
+      { id: 'wallet', icon: Wallet, label: 'Wallet' },
+    ];
+
+    if (state.currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      baseTabs.push({ id: 'admin', icon: ShieldCheck, label: 'Admin' });
+    }
+
+    return baseTabs;
+  }, [state.currentUser?.email]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 dark:bg-gray-950/95 backdrop-blur-2xl border-t border-gray-100 dark:border-white/5 flex justify-around items-center py-5 px-2 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-20px_50px_rgba(0,0,0,0.5)] z-50 transition-all duration-500 rounded-t-[32px]">

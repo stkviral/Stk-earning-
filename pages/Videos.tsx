@@ -5,7 +5,7 @@ import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, A
 import { MAX_DAILY_ADS, AD_GAP_MS, AD_REWARD_COINS } from '../types';
 
 const Videos: React.FC = () => {
-  const { state, playAd, addCoins, updateUser } = useApp();
+  const { state, playAd, addCoins, updateUser, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -48,6 +48,7 @@ const Videos: React.FC = () => {
           adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,
           lastAdTimestamp: Date.now()
         });
+        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${AD_REWARD_COINS} coins`);
       }
     }, 'REWARD');
   };

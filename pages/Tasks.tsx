@@ -6,7 +6,7 @@ import { Task } from '../types';
 import { playSound } from '../audioUtils';
 
 const Tasks: React.FC = () => {
-  const { state, addTask, completeTask } = useApp();
+  const { state, addTask, completeTask, logActivity } = useApp();
   const { currentUser } = state;
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -35,6 +35,7 @@ const Tasks: React.FC = () => {
     if (success) {
       playSound('collect');
       setProof('');
+      logActivity(currentUser.id, currentUser.name, 'TASK_COMPLETE', `Completed task: ${task.title}`);
     }
     setCompletingTaskId(null);
   };

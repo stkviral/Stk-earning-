@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { User, UserTag, UserStatus, COIN_TO_INR_RATE, AppSettings } from '../types';
 
-type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'logs';
+type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
 
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
   <div className="bg-gray-900 border border-gray-800 p-5 rounded-[32px] space-y-2 shadow-xl">
@@ -215,6 +215,7 @@ const AdminPanel: React.FC = () => {
         <NavItem tab="payouts" icon={CreditCard} label="Pay" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="features" icon={Sliders} label="Config" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="system" icon={Settings} label="System" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
+        <NavItem tab="activity" icon={Activity} label="Live" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="logs" icon={ScrollText} label="Log" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
       </div>
 
@@ -231,6 +232,32 @@ const AdminPanel: React.FC = () => {
                   <StatCard label="Paid Out" value={`₹${(analytics.payouts * COIN_TO_INR_RATE).toFixed(0)}`} sub="Total verified payouts" icon={Trophy} color="bg-green-500/10 text-green-500" />
                   <StatCard label="Queue" value={pendingPayouts.length} sub="Pending verification" icon={Clock} color="bg-orange-500/10 text-orange-500" />
                 </div>
+
+                <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-6 space-y-4">
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                         <Activity size={16} className="text-blue-500" />
+                         <h3 className="text-[10px] font-black uppercase tracking-widest">Recent Activity</h3>
+                      </div>
+                      <button onClick={() => setActiveTab('activity')} className="text-[8px] font-black text-blue-500 uppercase">View All</button>
+                   </div>
+                   <div className="space-y-3">
+                      {state.activityLogs.slice(0, 5).map(log => (
+                        <div key={log.id} className="flex items-center justify-between p-3 bg-gray-950 rounded-2xl border border-gray-800">
+                           <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-[10px] font-black text-blue-500 border border-gray-800">
+                                 {log.userName.charAt(0)}
+                              </div>
+                              <div>
+                                 <p className="text-[10px] font-black text-white uppercase italic">{log.userName}</p>
+                                 <p className="text-[8px] font-bold text-gray-600 uppercase">{log.action}</p>
+                              </div>
+                           </div>
+                           <span className="text-[8px] font-bold text-gray-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      ))}
+                   </div>
+                </div>
               </div>
             )}
 
@@ -238,21 +265,47 @@ const AdminPanel: React.FC = () => {
               <div className="space-y-6">
                 <div className="relative">
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-600" size={20} />
-                  <input type="text" placeholder="Scan Network..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-gray-900 border-2 border-gray-800 p-5 pl-14 rounded-[32px] text-xs font-black uppercase outline-none focus:border-blue-600 shadow-xl" />
+                  <input 
+                    type="text" 
+                    placeholder="Search by name or email..." 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                    className="w-full bg-gray-900 border-2 border-gray-800 p-5 pl-14 rounded-[32px] text-xs font-black uppercase outline-none focus:border-blue-600 shadow-xl" 
+                  />
+                  {searchTerm && (
+                    <button 
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-4">
-                  {state.allUsers.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
-                    <div key={u.id} onClick={() => setViewingUserId(u.id)} className="bg-gray-900 p-5 rounded-[40px] border border-gray-800 flex items-center justify-between shadow-xl active:scale-95 transition-all">
-                      <div className="flex items-center gap-4">
-                        <img src={u.avatar} className="w-12 h-12 rounded-2xl border border-gray-800" />
-                        <div>
-                          <p className="text-sm font-black italic">{u.name}</p>
-                          <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${u.status === UserStatus.ACTIVE ? 'text-blue-400' : 'text-red-500'}`}>{u.status}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="text-gray-700" />
+                  {state.allUsers.filter(u => 
+                    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).length === 0 ? (
+                    <div className="text-center py-12 bg-gray-900 rounded-[40px] border border-gray-800 opacity-50">
+                      <p className="text-[10px] font-black uppercase tracking-widest">No users found matching "{searchTerm}"</p>
                     </div>
-                  ))}
+                  ) : (
+                    state.allUsers.filter(u => 
+                      u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map(u => (
+                      <div key={u.id} onClick={() => setViewingUserId(u.id)} className="bg-gray-900 p-5 rounded-[40px] border border-gray-800 flex items-center justify-between shadow-xl active:scale-95 transition-all">
+                        <div className="flex items-center gap-4">
+                          <img src={u.avatar} className="w-12 h-12 rounded-2xl border border-gray-800" />
+                          <div>
+                            <p className="text-sm font-black italic">{u.name}</p>
+                            <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${u.status === UserStatus.ACTIVE ? 'text-blue-400' : 'text-red-500'}`}>{u.status}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="text-gray-700" />
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -428,6 +481,32 @@ const AdminPanel: React.FC = () => {
                      </div>
                   </div>
                </div>
+            )}
+
+            {activeTab === 'activity' && (
+              <div className="space-y-4">
+                 <div className="flex items-center gap-3 mb-2">
+                    <Activity className="text-blue-500" size={20} />
+                    <h3 className="text-xl font-black uppercase italic tracking-tighter">Live Network Feed</h3>
+                 </div>
+                 {state.activityLogs.map(log => (
+                   <div key={log.id} className="bg-gray-900 border border-gray-800 p-6 rounded-[32px] space-y-3 shadow-xl">
+                      <div className="flex justify-between items-center">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-950 rounded-xl flex items-center justify-center text-xs font-black text-blue-500 border border-gray-800">
+                               {log.userName.charAt(0)}
+                            </div>
+                            <div>
+                               <p className="text-xs font-black text-white uppercase italic">{log.userName}</p>
+                               <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{log.action}</span>
+                            </div>
+                         </div>
+                         <span className="text-[8px] font-bold text-gray-700">{new Date(log.timestamp).toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-gray-400 italic bg-gray-950 p-3 rounded-xl border border-gray-800">"{log.details}"</p>
+                   </div>
+                 ))}
+              </div>
             )}
 
             {activeTab === 'logs' && (

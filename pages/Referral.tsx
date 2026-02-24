@@ -114,7 +114,6 @@ const Referral: React.FC = () => {
          <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed tracking-wider">Rewards are added instantly when your friend completes their first withdrawal. Fake accounts will be banned.</p>
       </div>
     </div>
-    </div>
   );
 };
 

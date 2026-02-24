@@ -67,7 +67,7 @@ const TapRipple: React.FC<{ x: number; y: number }> = ({ x, y }) => (
 );
 
 const Mining: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, setActiveTab } = useApp();
+  const { state, playAd, addCoins, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [adsWatchedToStart, setAdsWatchedToStart] = useState(0);
   const [adsWatchedToClaim, setAdsWatchedToClaim] = useState(0);
@@ -122,6 +122,7 @@ const Mining: React.FC = () => {
     if (isPass) {
         playSound('ignite');
         updateUser({ miningStartedAt: Date.now(), miningClaimed: false });
+        logActivity(currentUser.id, currentUser.name, 'MINING_START', 'Started mining reactor (VIP)');
         return;
     }
 
@@ -132,6 +133,7 @@ const Mining: React.FC = () => {
       if (nextCount >= 3) {
         playSound('ignite');
         updateUser({ miningStartedAt: Date.now(), miningClaimed: false });
+        logActivity(currentUser.id, currentUser.name, 'MINING_START', 'Started mining reactor');
         setAdsWatchedToStart(0);
       }
       setIsProcessing(false);
@@ -152,6 +154,7 @@ const Mining: React.FC = () => {
                 miningClaimed: true,
                 is2xMiningUnlocked: false
             });
+            logActivity(currentUser.id, currentUser.name, 'MINING_CLAIM', `Claimed ${finalReward} coins (VIP)`);
         }
         return;
     }
@@ -170,6 +173,7 @@ const Mining: React.FC = () => {
             miningClaimed: true,
             is2xMiningUnlocked: false
           });
+          logActivity(currentUser.id, currentUser.name, 'MINING_CLAIM', `Claimed ${finalReward} coins`);
         }
         setAdsWatchedToClaim(0);
       }
@@ -270,7 +274,7 @@ const Mining: React.FC = () => {
       </div>
 
       {/* Controls & Tooltips */}
-      <div className="bg-white dark:bg-gray-900 rounded-[48px] p-7 shadow-xl border border-gray-100 dark:border-gray-800 space-y-6 relative z-10">
+      <div className="bg-white dark:bg-gray-900 rounded-[40px] p-6 shadow-xl border border-gray-100 dark:border-gray-800 space-y-5 relative z-10">
          
          {showTooltip === 'main' && (
            <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-3xl border border-blue-100 dark:border-blue-800 animate-in slide-in-from-top-2">
@@ -290,7 +294,7 @@ const Mining: React.FC = () => {
            </div>
          )}
 
-         <div className="space-y-4">
+         <div className="space-y-3">
             <div className="flex justify-between items-end px-1">
                <div className="flex items-center gap-2">
                   <Cpu size={14} className="text-blue-500" />
@@ -313,7 +317,7 @@ const Mining: React.FC = () => {
               <button 
                 onClick={handleClaimReward}
                 disabled={isProcessing}
-                className="w-full bg-green-600 text-white py-7 rounded-[36px] font-black text-xl shadow-2xl shadow-green-500/30 border-b-[8px] border-green-900 active:scale-95 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center gap-3"
+                className="w-full bg-green-600 text-white py-6 rounded-[32px] font-black text-xl shadow-2xl shadow-green-500/30 border-b-[6px] border-green-900 active:scale-95 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center gap-3"
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={28} /> : (
                     <>
@@ -326,7 +330,7 @@ const Mining: React.FC = () => {
               </button>
             </div>
          ) : isMiningActive ? (
-            <div className="w-full bg-blue-50 dark:bg-blue-900/20 py-7 rounded-[36px] border-2 border-dashed border-blue-200 dark:border-blue-800 text-center flex flex-col items-center gap-2 group">
+            <div className="w-full bg-blue-50 dark:bg-blue-900/20 py-6 rounded-[32px] border-2 border-dashed border-blue-200 dark:border-blue-800 text-center flex flex-col items-center gap-2 group">
                <div className="flex items-center gap-2">
                   <Activity size={14} className="text-blue-500 animate-pulse" />
                   <p className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">MINING ACTIVE</p>
@@ -343,7 +347,7 @@ const Mining: React.FC = () => {
                </div>
             </div>
          ) : isCooldownActive ? (
-            <div className="w-full bg-gray-50 dark:bg-gray-800/50 py-7 rounded-[36px] border-2 border-dashed border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-1 opacity-60">
+            <div className="w-full bg-gray-50 dark:bg-gray-800/50 py-6 rounded-[32px] border-2 border-dashed border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-1 opacity-60">
                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">CORE RECHARGE</p>
                <div className="flex items-center gap-2 text-gray-400 font-black text-2xl tracking-tighter italic">
                   <Clock size={22} />
@@ -360,7 +364,7 @@ const Mining: React.FC = () => {
               <button 
                 onClick={handleStartMining}
                 disabled={isProcessing}
-                className={`w-full py-7 rounded-[36px] font-black text-2xl shadow-3xl border-b-[10px] transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden ${isVisualPremium ? 'bg-orange-600 border-orange-900 text-white shadow-orange-500/30' : 'bg-blue-600 border-blue-900 text-white shadow-blue-500/30'} active:scale-95 active:border-b-0 active:translate-y-2`}
+                className={`w-full py-6 rounded-[32px] font-black text-xl shadow-3xl border-b-[8px] transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden ${isVisualPremium ? 'bg-orange-600 border-orange-900 text-white shadow-orange-500/30' : 'bg-blue-600 border-blue-900 text-white shadow-blue-500/30'} active:scale-95 active:border-b-0 active:translate-y-2`}
               >
                 <div className="flex items-center gap-3 relative z-10">
                    {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Pickaxe size={28} className="group-hover:rotate-45 transition-transform" />}

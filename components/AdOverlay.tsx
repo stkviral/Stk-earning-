@@ -26,7 +26,7 @@ const AdOverlay: React.FC<AdOverlayProps> = ({ type, onClose }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6 text-white text-center">
+    <div className="fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center p-6 text-white text-center">
       <div className="absolute top-4 right-4">
         {canClose ? (
           <button 

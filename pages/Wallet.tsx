@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../App';
 import { 
   ArrowUpRight, 
@@ -44,75 +45,122 @@ const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
   const isPending = tx.status === 'PENDING';
   const isRejected = tx.status === 'REJECTED';
 
+  const progressSteps = [
+    { label: 'Submitted', done: true, time: 'Instant' },
+    { label: 'Verifying', done: isCompleted || isRejected, active: isPending, time: '1-2h' },
+    { label: 'Payout', done: isCompleted, active: false, time: '2-24h' }
+  ];
+
   return (
-    <div 
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.01 }}
       onClick={() => { playSound('tap'); setShowDetails(!showDetails); }}
-      className={`group relative overflow-hidden bg-white dark:bg-gray-900 rounded-[32px] border transition-all duration-500 cursor-pointer ${
-        showDetails ? 'border-blue-400 dark:border-blue-500/50 shadow-2xl ring-1 ring-blue-100 dark:ring-blue-900/20' : 'border-gray-100 dark:border-gray-800 shadow-sm hover:border-gray-200 dark:hover:border-gray-700'
+      className={`group relative overflow-hidden bg-white dark:bg-gray-900 rounded-[28px] border transition-all duration-500 cursor-pointer ${
+        showDetails ? 'border-blue-400 dark:border-blue-500/50 shadow-xl ring-1 ring-blue-100 dark:ring-blue-900/20' : 'border-gray-100 dark:border-gray-800 shadow-sm hover:border-gray-200 dark:hover:border-gray-700'
       }`}
     >
-      <div className="p-5 flex items-center justify-between relative z-10">
+      <div className="p-4 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-[22px] flex items-center justify-center transition-all duration-500 ${
+          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-500 ${
             isWithdraw 
               ? (isRejected ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-600 dark:bg-orange-900/20') 
               : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20'
           } ${showDetails ? 'scale-110 rotate-6' : 'group-hover:scale-105'}`}>
-            {isWithdraw ? <ArrowUpRight size={24} /> : <ArrowDownLeft size={24} />}
+            {isWithdraw ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}
           </div>
           <div>
             <p className="text-[13px] font-black text-gray-900 dark:text-white uppercase italic tracking-tight leading-none truncate max-w-[140px]">
               {tx.method}
             </p>
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-              <Calendar size={10} />
-              {new Date(tx.timestamp).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-              <span className="opacity-40">•</span>
-              <Clock size={10} />
-              {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest border ${
+                isCompleted ? 'bg-green-500/10 text-green-600 border-green-500/20' : 
+                isRejected ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                'bg-orange-500/10 text-orange-600 border-orange-500/20'
+              }`}>
+                {tx.status}
+              </span>
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                <Clock size={8} />
+                {new Date(tx.timestamp).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+              </p>
+            </div>
           </div>
         </div>
-        <div className="text-right flex flex-col items-end gap-1.5">
+        <div className="text-right">
           <span className={`text-lg font-black tracking-tighter tabular-nums ${isWithdraw ? 'text-red-600' : 'text-green-600'}`}>
             {isWithdraw ? '-' : '+'} {tx.amount.toLocaleString()}
           </span>
-          <div className={`px-2.5 py-1 rounded-full text-[7px] font-black uppercase tracking-widest border ${
-            isCompleted ? 'bg-green-500/10 text-green-600 border-green-500/20' : 
-            isRejected ? 'bg-red-500/10 text-red-600 border-red-500/20' :
-            'bg-orange-500/10 text-orange-600 border-orange-500/20'
-          }`}>
-            {tx.status}
-          </div>
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">STK Coins</p>
         </div>
       </div>
 
-      {showDetails && (
-        <div className="px-6 pb-6 pt-2 space-y-5 animate-in slide-in-from-top-2 duration-500">
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-100 dark:via-gray-800 to-transparent" />
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaction ID</p>
-              <p className="text-[10px] font-mono font-bold text-gray-600 dark:text-gray-300 break-all bg-gray-50 dark:bg-gray-800/50 p-2 rounded-xl border border-gray-100 dark:border-gray-800">{tx.id}</p>
+      <AnimatePresence>
+        {showDetails && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 pb-5 pt-1 space-y-4">
+              <div className="h-px bg-gradient-to-r from-transparent via-gray-100 dark:via-gray-800 to-transparent" />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[7px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaction ID</p>
+                  <p className="text-[9px] font-mono font-bold text-gray-600 dark:text-gray-300 break-all bg-gray-50 dark:bg-gray-800/50 p-2 rounded-xl border border-gray-100 dark:border-gray-800">{tx.id}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[7px] font-black text-gray-400 uppercase tracking-[0.2em]">Cash Value</p>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter italic">₹{(tx.amount * COIN_TO_INR_RATE).toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-2xl flex flex-col gap-3 border border-blue-100/50 dark:border-blue-800/30">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <ShieldCheck size={14} className="text-blue-500" />
+                       <span className="text-[8px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Network Verified</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                       <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+                       <span className="text-[8px] font-black text-green-600 uppercase tracking-widest">Secured</span>
+                    </div>
+                 </div>
+
+                 {isWithdraw && !isRejected && (
+                   <div className="space-y-2">
+                     <div className="flex justify-between items-center">
+                        <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Payout Timeline</span>
+                        <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest italic">Est. 24h</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        {progressSteps.map((step, i) => (
+                          <React.Fragment key={i}>
+                            <div className="flex flex-col items-center gap-1 flex-1">
+                              <div className={`w-full h-1 rounded-full transition-all duration-1000 ${step.done ? 'bg-green-500' : (step.active ? 'bg-blue-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-800')}`} />
+                              <div className="flex justify-between w-full px-0.5">
+                                <span className={`text-[5px] font-black uppercase ${step.done ? 'text-green-600' : (step.active ? 'text-blue-500' : 'text-gray-400')}`}>{step.label}</span>
+                                <span className="text-[5px] font-bold text-gray-400 opacity-50">{step.time}</span>
+                              </div>
+                            </div>
+                            {i < progressSteps.length - 1 && <div className="w-0.5 h-0.5 rounded-full bg-gray-200 dark:bg-gray-800 mt-[-6px]" />}
+                          </React.Fragment>
+                        ))}
+                     </div>
+                   </div>
+                 )}
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Value Conversion</p>
-              <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter italic">₹{(tx.amount * COIN_TO_INR_RATE).toFixed(2)} Cash Value</p>
-            </div>
-          </div>
-          <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl flex items-center justify-between border border-blue-100/50 dark:border-blue-800/30">
-             <div className="flex items-center gap-3">
-                <ShieldCheck size={16} className="text-blue-500" />
-                <span className="text-[9px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">Network Verified</span>
-             </div>
-             <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Secured</span>
-             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 
@@ -279,24 +327,64 @@ const Wallet: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-[56px] p-8 shadow-2xl border border-gray-100 dark:border-gray-800 space-y-10 relative overflow-hidden group">
+      <div className="bg-white dark:bg-gray-900 rounded-[48px] p-6 shadow-2xl border border-gray-100 dark:border-gray-800 space-y-8 relative overflow-hidden group">
         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none group-hover:rotate-12 transition-transform duration-1000">
            <Layers size={180} />
         </div>
         
-        <div className="flex items-center gap-5 relative z-10">
-          <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center shadow-lg transition-all duration-700 ${cooldownRemaining ? 'bg-orange-500/10 text-orange-600' : 'bg-blue-600 text-white shadow-blue-500/30'}`}>
-            {cooldownRemaining ? <Clock size={32} className="animate-pulse" /> : <ArrowLeftRight size={32} />}
+        <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-5">
+            <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center shadow-lg transition-all duration-700 ${cooldownRemaining ? 'bg-orange-500/10 text-orange-600' : 'bg-blue-600 text-white shadow-blue-500/30'}`}>
+              {cooldownRemaining ? <Clock size={32} className="animate-pulse" /> : <ArrowLeftRight size={32} />}
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none">Withdrawal</h3>
+              <p className={`text-[10px] font-black uppercase tracking-widest ${cooldownRemaining ? 'text-orange-500' : 'text-gray-400'}`}>
+                {cooldownRemaining ? `Next Withdrawal in: ${cooldownRemaining}` : 'Transfer your earnings to UPI'}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none">Withdrawal</h3>
-            <p className={`text-[10px] font-black uppercase tracking-widest ${cooldownRemaining ? 'text-orange-500' : 'text-gray-400'}`}>
-              {cooldownRemaining ? `Next Withdrawal in: ${cooldownRemaining}` : 'Transfer your earnings to UPI'}
-            </p>
+          <div className="hidden sm:flex flex-col items-end gap-1">
+             <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Estimated Time</span>
+             <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">2 - 24 Hours</span>
           </div>
         </div>
 
-        <form onSubmit={handleWithdrawInitiate} className="space-y-12 relative z-10">
+        {/* Withdrawal Progress Roadmap */}
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-5 border border-gray-100 dark:border-gray-800 relative overflow-hidden">
+           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600/20 via-blue-600/40 to-blue-600/20" />
+           <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                 <Activity size={12} className="text-blue-500 animate-pulse" />
+                 <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Payout Roadmap</span>
+              </div>
+              <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest italic">Live Network Status</span>
+           </div>
+           <div className="flex items-center gap-4">
+              {[
+                { label: 'Request', time: 'Instant', icon: <Zap size={10} /> },
+                { label: 'Audit', time: '1-2h', icon: <ShieldCheck size={10} /> },
+                { label: 'Payout', time: '2-24h', icon: <ArrowUpRight size={10} /> }
+              ].map((step, i) => (
+                <div key={i} className="flex-1 space-y-2">
+                   <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                         {step.icon}
+                      </div>
+                      <div className="h-0.5 flex-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                         <div className="h-full bg-blue-500/30 w-full animate-shimmer-wave" />
+                      </div>
+                   </div>
+                   <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-gray-900 dark:text-white uppercase tracking-tight">{step.label}</span>
+                      <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">{step.time}</span>
+                   </div>
+                </div>
+              ))}
+           </div>
+        </div>
+
+        <form onSubmit={handleWithdrawInitiate} className="space-y-8 relative z-10">
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
               <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -317,7 +405,7 @@ const Wallet: React.FC = () => {
                 placeholder="handle@bank"
                 value={upiId}
                 onChange={(e) => setUpiId(e.target.value.toLowerCase())}
-                className={`w-full bg-gray-50 dark:bg-gray-800 border-2 p-7 rounded-[36px] text-base font-black text-gray-900 dark:text-white outline-none transition-all shadow-inner placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+                className={`w-full bg-gray-50 dark:bg-gray-800 border-2 p-5 rounded-[28px] text-base font-black text-gray-900 dark:text-white outline-none transition-all shadow-inner placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
                   upiId ? (isUpiValid ? 'border-green-100 dark:border-green-500/30 focus:border-green-500' : 'border-red-100 dark:border-red-500/30 focus:border-red-500') : 'border-gray-100 dark:border-gray-700 focus:border-blue-600'
                 }`}
                 disabled={!!cooldownRemaining}
@@ -337,14 +425,14 @@ const Wallet: React.FC = () => {
                </div>
             </div>
             
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               {[500, 1000, 2500].map(val => (
                 <button
                   key={val}
                   type="button"
                   disabled={!!cooldownRemaining}
                   onClick={() => { playSound('tap'); setWithdrawAmount(val); }}
-                  className={`py-8 rounded-[36px] transition-all duration-500 border-2 flex flex-col items-center justify-center gap-1.5 active:scale-95 relative overflow-hidden ${
+                  className={`py-6 rounded-[28px] transition-all duration-500 border-2 flex flex-col items-center justify-center gap-1.5 active:scale-95 relative overflow-hidden ${
                     numAmount === val 
                     ? 'bg-blue-600 text-white border-blue-400 shadow-xl scale-105' 
                     : 'bg-white dark:bg-gray-800 text-gray-400 border-gray-100 dark:border-gray-700 hover:border-blue-200'
@@ -367,7 +455,7 @@ const Wallet: React.FC = () => {
                  value={withdrawAmount}
                  onChange={(e) => setWithdrawAmount(e.target.value)}
                  disabled={!!cooldownRemaining}
-                 className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 p-7 pl-16 rounded-[36px] text-base font-black text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all shadow-inner tabular-nums"
+                 className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 p-5 pl-16 rounded-[28px] text-base font-black text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all shadow-inner tabular-nums"
                />
             </div>
           </div>
@@ -392,7 +480,7 @@ const Wallet: React.FC = () => {
           <button 
             type="submit"
             disabled={currentUser.coins < numAmount || numAmount < minThreshold || !isUpiValid || !!cooldownRemaining}
-            className={`w-full py-8 rounded-[40px] font-black text-2xl shadow-3xl transition-all border-b-[12px] uppercase tracking-widest flex items-center justify-center gap-5 group relative overflow-hidden ${
+            className={`w-full py-6 rounded-[32px] font-black text-xl shadow-3xl transition-all border-b-[8px] uppercase tracking-widest flex items-center justify-center gap-5 group relative overflow-hidden ${
               currentUser.coins < numAmount || numAmount < minThreshold || !isUpiValid || !!cooldownRemaining
               ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 cursor-not-allowed opacity-40 grayscale'
               : 'bg-blue-600 text-white border-blue-900 shadow-blue-500/30 active:scale-95 active:border-b-[4px] active:translate-y-2'
@@ -433,20 +521,31 @@ const Wallet: React.FC = () => {
            </div>
         </div>
 
-        <div className="space-y-5">
-          {filteredTransactions.length === 0 ? (
-            <div className="text-center py-24 bg-white dark:bg-gray-900 rounded-[56px] border-2 border-dashed border-gray-100 dark:border-gray-800 flex flex-col items-center opacity-40 animate-in fade-in zoom-in-95 duration-700">
-              <div className="w-24 h-24 bg-gray-50 dark:bg-gray-800/50 rounded-[40px] flex items-center justify-center mb-6">
-                <PieChart size={48} className="text-gray-300 dark:text-gray-700" />
-              </div>
-              <p className="text-[11px] font-black uppercase tracking-[0.6em] text-gray-400">Zero Node Activity</p>
-            </div>
-          ) : (
-            filteredTransactions.slice(0, 30).map(tx => (
-              <TransactionItem key={tx.id} tx={tx} />
-            ))
-          )}
-        </div>
+        <motion.div 
+          layout
+          className="space-y-4"
+        >
+          <AnimatePresence mode="popLayout">
+            {filteredTransactions.length === 0 ? (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="text-center py-20 bg-white dark:bg-gray-900 rounded-[48px] border-2 border-dashed border-gray-100 dark:border-gray-800 flex flex-col items-center opacity-40"
+              >
+                <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800/50 rounded-[32px] flex items-center justify-center mb-5">
+                  <PieChart size={40} className="text-gray-300 dark:text-gray-700" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-400">Zero Node Activity</p>
+              </motion.div>
+            ) : (
+              filteredTransactions.slice(0, 30).map((tx, index) => (
+                <TransactionItem key={tx.id} tx={tx} />
+              ))
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
 
       {showConfirmModal && (
@@ -556,6 +655,12 @@ const Wallet: React.FC = () => {
           </div>
         </div>
       )}
+      {/* App Version */}
+      <div className="pt-10 pb-4 text-center">
+        <p className="text-[9px] font-black text-gray-300 dark:text-gray-800 uppercase tracking-[0.5em] cursor-default select-none">
+          STK Network v{settings.appVersion}
+        </p>
+      </div>
     </div>
   );
 };
