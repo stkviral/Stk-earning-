@@ -1,46 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { User, Transaction, Task } from "./types";
+import { User, Transaction } from "./types";
 
 // Fix: Removed module-level initialization to follow guidelines:
 // "Create a new GoogleGenAI instance right before making an API call"
 
 export const BackendAI = {
-  /**
-   * Verifies a user's task proof using AI reasoning.
-   */
-  async verifyTaskProof(task: Task, proof: string): Promise<{ success: boolean; reason: string }> {
-    try {
-      // Fix: Creating instance right before making an API call as per SDK guidelines
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Act as a professional earning app auditor. 
-          Task: ${task.title}
-          User Proof: "${proof}"
-          Determine if this proof is plausible for the given task. 
-          Return JSON: { "success": boolean, "reason": "short explanation" }`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              success: { type: Type.BOOLEAN },
-              reason: { type: Type.STRING }
-            },
-            required: ["success", "reason"]
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text);
-      return result;
-    } catch (error) {
-      console.error("AI Verification Failed", error);
-      return { success: true, reason: "Bypass: AI Service Unavailable" };
-    }
-  },
-
   /**
    * Analyzes user behavior for fraud detection.
    */

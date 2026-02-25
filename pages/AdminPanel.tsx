@@ -12,11 +12,11 @@ import {
   Server, Cpu, Database, Network, Trophy, Gift, CheckSquare,
   Image as ImageIcon, Upload, Trash2, Palette, Sparkles, Sliders,
   RefreshCw, Save, Info, Bell, Pickaxe, Disc, PlayCircle, Radio,
-  UserCog, Terminal, Lock, Laptop, Cloud
+  UserCog, Terminal, Lock, Laptop, Cloud, Crown
 } from 'lucide-react';
 import { User, UserTag, UserStatus, COIN_TO_INR_RATE, AppSettings } from '../types';
 
-type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
+type AdminTab = 'dashboard' | 'users' | 'passes' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
 
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
   <div className="bg-gray-900 border border-gray-800 p-5 rounded-[32px] space-y-2 shadow-xl">
@@ -124,9 +124,9 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
           <div className="space-y-6">
             <div className="bg-gray-950 p-4 rounded-2xl space-y-3">
               <label className="text-[9px] font-black text-gray-500 uppercase">Protocol Adjustment</label>
-              <input type="text" placeholder="Audit Reason..." value={actionReason} onChange={e => setActionReason(e.target.value)} className="w-full bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none" />
+              <input type="text" placeholder="Audit Reason..." value={actionReason || ''} onChange={e => setActionReason(e.target.value)} className="w-full bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none" />
               <div className="flex gap-2">
-                <input type="number" placeholder="Amt" value={coinAdjustment} onChange={e => setCoinAdjustment(e.target.value)} className="flex-1 bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none" />
+                <input type="number" placeholder="Amt" value={coinAdjustment || ''} onChange={e => setCoinAdjustment(e.target.value)} className="flex-1 bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none" />
                 <button onClick={() => handleAdjustCoins('ADD')} className="bg-green-600 px-4 rounded-xl text-white"><Plus size={18} /></button>
                 <button onClick={() => handleAdjustCoins('REMOVE')} className="bg-red-600 px-4 rounded-xl text-white"><Minus size={18} /></button>
               </div>
@@ -149,6 +149,30 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${!user.adsBlocked ? 'left-7' : 'left-1'}`} />
                </button>
             </div>
+
+            {user.tag === UserTag.PASS && (
+              <div className="bg-red-600/10 border border-red-600/20 p-5 rounded-[32px] flex items-center justify-between mt-4">
+                 <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-red-600 text-white">
+                       <Crown size={16} />
+                    </div>
+                    <div>
+                       <p className="text-[10px] font-black text-white uppercase tracking-widest">VIP Status</p>
+                       <p className="text-[8px] font-bold text-red-500 uppercase">Active Membership</p>
+                    </div>
+                 </div>
+                 <button 
+                    onClick={() => {
+                      if (window.confirm(`Revoke VIP access for ${user.name}?`)) {
+                        adminActions.updateUserSettings(user.id, { tag: UserTag.NORMAL });
+                      }
+                    }}
+                    className="bg-red-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20"
+                 >
+                    Revoke
+                 </button>
+              </div>
+            )}
             
             <div className="space-y-3 pt-4">
               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest px-1">Recent Ledger</p>
@@ -174,8 +198,23 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                 </button>
               ))}
             </div>
+            <div className="space-y-3">
+              <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest px-1">Membership Tier</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(Object.values(UserTag)).map(tag => (
+                  <button 
+                    key={tag}
+                    onClick={() => setEditTag(tag)}
+                    className={`p-4 rounded-2xl border font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${editTag === tag ? 'bg-yellow-500 border-yellow-400 text-white' : 'bg-gray-950 border-gray-800 text-gray-500 hover:border-gray-600'}`}
+                  >
+                    {tag === UserTag.PASS && <Crown size={12} />}
+                    {tag === UserTag.PASS ? 'VIP Pass' : 'Normal'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="space-y-4">
-              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-white font-black" />
+              <input type="text" value={editName || ''} onChange={e => setEditName(e.target.value)} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-white font-black" />
               <button onClick={handleUpdateProfile} className="w-full bg-white text-gray-950 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl">Update Profile</button>
             </div>
           </div>
@@ -190,6 +229,7 @@ const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const pendingPayouts = useMemo(() => state.allUsers.flatMap(user => 
     user.transactions
@@ -209,9 +249,28 @@ const AdminPanel: React.FC = () => {
 
   return (
     <div className="min-h-full bg-gray-950 text-gray-100 pb-32">
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative w-full max-w-2xl h-full max-h-[80vh] flex flex-col items-center justify-center gap-6">
+            <button 
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-12 right-0 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all"
+            >
+              <X size={24} />
+            </button>
+            <div className="w-full h-full bg-gray-900 rounded-[40px] overflow-hidden border border-gray-800 shadow-3xl">
+              <img src={previewImage} className="w-full h-full object-contain" alt="Full Proof" />
+            </div>
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.5em]">Payment Verification Node</p>
+          </div>
+        </div>
+      )}
+
       <div className="sticky top-0 z-30 bg-gray-900 border-b border-gray-800 px-4 py-4 flex items-center justify-around shadow-2xl">
         <NavItem tab="dashboard" icon={LayoutDashboard} label="Stats" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="users" icon={Users} label="Users" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
+        <NavItem tab="passes" icon={Crown} label="Pass" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="payouts" icon={CreditCard} label="Pay" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="features" icon={Sliders} label="Config" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="system" icon={Settings} label="System" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
@@ -268,7 +327,7 @@ const AdminPanel: React.FC = () => {
                   <input 
                     type="text" 
                     placeholder="Search by name or email..." 
-                    value={searchTerm} 
+                    value={searchTerm || ''} 
                     onChange={e => setSearchTerm(e.target.value)} 
                     className="w-full bg-gray-900 border-2 border-gray-800 p-5 pl-14 rounded-[32px] text-xs font-black uppercase outline-none focus:border-blue-600 shadow-xl" 
                   />
@@ -310,6 +369,82 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
+            {activeTab === 'passes' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Crown className="text-yellow-500" size={20} />
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter">VIP Pass Requests</h3>
+                </div>
+                {state.passRequests.filter(r => r.status === 'PENDING').length === 0 ? (
+                  <div className="text-center py-12 bg-gray-900 rounded-[40px] border border-gray-800 opacity-50">
+                    <p className="text-[10px] font-black uppercase tracking-widest">No pending pass requests</p>
+                  </div>
+                ) : (
+                  state.passRequests.filter(r => r.status === 'PENDING').map(request => (
+                    <div key={request.id} className="bg-gray-900 p-8 rounded-[48px] border border-gray-800 space-y-6 shadow-2xl">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-base font-black italic text-yellow-500 cursor-pointer" onClick={() => setViewingUserId(request.userId)}>{request.userName}</h4>
+                          <p className="text-[10px] font-black text-gray-500 uppercase">{request.userEmail}</p>
+                        </div>
+                        <span className="text-[8px] font-bold text-gray-600 uppercase">{new Date(request.timestamp).toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Payment Proof</p>
+                        <div className="relative w-full aspect-video rounded-3xl overflow-hidden border border-gray-800 group">
+                          <img src={request.proofUrl} alt="Proof" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              onClick={() => setPreviewImage(request.proofUrl)}
+                              className="p-3 bg-white text-gray-900 rounded-2xl shadow-xl font-black text-[10px] uppercase tracking-widest"
+                            >
+                              View Full Size
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={() => adminActions.rejectPassRequest(request.id)}
+                          className="flex-1 bg-red-600/10 border border-red-600 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase"
+                        >
+                          Reject
+                        </button>
+                        <button 
+                          onClick={() => adminActions.approvePassRequest(request.id)}
+                          className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-600/20"
+                        >
+                          Approve VIP
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {state.passRequests.filter(r => r.status !== 'PENDING').length > 0 && (
+                  <div className="pt-8 space-y-4">
+                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-2">Request History</p>
+                    {state.passRequests.filter(r => r.status !== 'PENDING').slice(0, 10).map(request => (
+                      <div key={request.id} className="bg-gray-900/50 p-4 rounded-3xl border border-gray-800 flex items-center justify-between opacity-60">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${request.status === 'APPROVED' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                            {request.status === 'APPROVED' ? <CheckCircle2 size={16} /> : <X size={16} />}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-white uppercase">{request.userName}</p>
+                            <p className="text-[8px] font-bold text-gray-600 uppercase">{request.status} • {new Date(request.timestamp).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => setPreviewImage(request.proofUrl)} className="text-gray-600 hover:text-white"><ImageIcon size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'payouts' && (
               <div className="space-y-6">
                  {pendingPayouts.map(tx => (
@@ -340,11 +475,11 @@ const AdminPanel: React.FC = () => {
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <label className="text-[9px] font-black text-gray-600 uppercase">Norm Reward</label>
-                           <input type="number" value={state.settings.miningRewardNormal} onChange={e => updateSettings({ miningRewardNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                           <input type="number" value={state.settings.miningRewardNormal ?? 0} onChange={e => updateSettings({ miningRewardNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
                         <div className="space-y-2">
                            <label className="text-[9px] font-black text-gray-600 uppercase">VIP Reward</label>
-                           <input type="number" value={state.settings.miningRewardVIP} onChange={e => updateSettings({ miningRewardVIP: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                           <input type="number" value={state.settings.miningRewardVIP ?? 0} onChange={e => updateSettings({ miningRewardVIP: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
                      </div>
                   </div>
@@ -355,12 +490,38 @@ const AdminPanel: React.FC = () => {
                      </div>
                      <div className="grid grid-cols-4 gap-2">
                         {state.settings.spinRewards.map((val, idx) => (
-                          <input key={idx} type="number" value={val} onChange={e => {
+                          <input key={idx} type="number" value={val ?? 0} onChange={e => {
                              const n = [...state.settings.spinRewards];
                              n[idx] = parseInt(e.target.value) || 0;
                              updateSettings({ spinRewards: n });
                           }} className="bg-gray-950 border border-gray-800 p-3 rounded-xl text-center text-xs font-black text-white" />
                         ))}
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Max Daily Spins</label>
+                           <input type="number" value={state.settings.maxDailySpinsNormal ?? 0} onChange={e => updateSettings({ maxDailySpinsNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Cooldown (Min)</label>
+                           <input type="number" value={state.settings.spinCooldownMinutes ?? 0} onChange={e => updateSettings({ spinCooldownMinutes: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                     </div>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-8 space-y-8 shadow-2xl">
+                     <div className="flex items-center gap-3">
+                        <PlayCircle className="text-blue-500" size={24} />
+                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Ad Settings</h3>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Ad Reward (Coins)</label>
+                           <input type="number" value={state.settings.adRewardCoins ?? 0} onChange={e => updateSettings({ adRewardCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Max Daily Ads</label>
+                           <input type="number" value={state.settings.maxDailyAds ?? 0} onChange={e => updateSettings({ maxDailyAds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
                      </div>
                   </div>
                </div>
@@ -464,7 +625,48 @@ const AdminPanel: React.FC = () => {
                            <label className="text-[9px] font-black text-gray-600 uppercase">Min Withdrawal</label>
                            <input type="number" value={state.settings.minWithdrawalCoins} onChange={e => updateSettings({ minWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
                         </div>
-                        <div className="flex items-center gap-6 pt-4">
+                        <div className="space-y-2 pt-4 border-t border-gray-800">
+                           <label className="text-[9px] font-black text-gray-600 uppercase px-1">Admin UPI ID</label>
+                           <input 
+                              type="text" 
+                              value={state.settings.adminUpiId} 
+                              onChange={e => updateSettings({ adminUpiId: e.target.value })} 
+                              placeholder="e.g. yourname@upi"
+                              className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black outline-none focus:border-blue-600" 
+                           />
+                        </div>
+                        <div className="space-y-4 pt-4 border-t border-gray-800">
+                           <label className="text-[9px] font-black text-gray-600 uppercase px-1">Payment QR Code</label>
+                           <div className="flex items-center gap-6">
+                              <div className="w-24 h-24 bg-white rounded-2xl p-2 flex items-center justify-center border-2 border-gray-800 shadow-inner">
+                                 <img src={state.settings.paymentQrUrl} className="w-full h-full object-contain" alt="QR" />
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                 <button 
+                                    onClick={() => document.getElementById('qrUpload')?.click()} 
+                                    className="w-full bg-gray-800 text-white py-3 rounded-xl font-black text-[10px] uppercase border border-gray-700 hover:bg-gray-700 transition-all"
+                                 >
+                                    Upload New QR
+                                 </button>
+                                 <input 
+                                    type="text" 
+                                    value={state.settings.paymentQrUrl} 
+                                    onChange={e => updateSettings({ paymentQrUrl: e.target.value })} 
+                                    placeholder="Or enter URL..."
+                                    className="w-full bg-gray-950 border border-gray-800 p-3 rounded-xl text-white font-black text-[9px] outline-none focus:border-blue-600" 
+                                 />
+                              </div>
+                              <input type="file" id="qrUpload" className="hidden" accept="image/*" onChange={e => {
+                                 const f = e.target.files?.[0];
+                                 if (f) {
+                                    const r = new FileReader();
+                                    r.onloadend = () => updateSettings({ paymentQrUrl: r.result as string });
+                                    r.readAsDataURL(f);
+                                 }
+                              }} />
+                           </div>
+                        </div>
+                        <div className="flex items-center gap-6 pt-4 border-t border-gray-800">
                            <div className="w-16 h-16 bg-white rounded-2xl p-2 flex items-center justify-center border-2 border-gray-800">
                               <img src={state.logoUrl || './logo.png'} className="w-full h-full object-contain" />
                            </div>

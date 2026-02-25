@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../App';
 import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, Activity, Flame, Sparkles, ZapOff, ShieldOff, AlertTriangle } from 'lucide-react';
-import { MAX_DAILY_ADS, AD_GAP_MS, AD_REWARD_COINS } from '../types';
+import { AD_GAP_MS } from '../types';
 
 const Videos: React.FC = () => {
   const { state, playAd, addCoins, updateUser, logActivity } = useApp();
@@ -30,8 +30,8 @@ const Videos: React.FC = () => {
       return;
     }
 
-    if (currentUser.adsWatchedToday >= MAX_DAILY_ADS) {
-      alert(`You have reached today's limit (${MAX_DAILY_ADS}/${MAX_DAILY_ADS})!`);
+    if (currentUser.adsWatchedToday >= settings.maxDailyAds) {
+      alert(`You have reached today's limit (${currentUser.adsWatchedToday}/${settings.maxDailyAds})!`);
       return;
     }
 
@@ -42,18 +42,18 @@ const Videos: React.FC = () => {
 
     // playAd will instantly call the callback if settings.adsEnabled is false
     playAd(() => {
-      const success = addCoins(AD_REWARD_COINS, 'Video Watch');
+      const success = addCoins(settings.adRewardCoins, 'Video Watch');
       if (success) {
         updateUser({
           adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,
           lastAdTimestamp: Date.now()
         });
-        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${AD_REWARD_COINS} coins`);
+        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${settings.adRewardCoins} coins`);
       }
     }, 'REWARD');
   };
 
-  const progress = (currentUser.adsWatchedToday / MAX_DAILY_ADS) * 100;
+  const progress = (currentUser.adsWatchedToday / settings.maxDailyAds) * 100;
 
   return (
     <div className="p-4 space-y-4 animate-in fade-in duration-700 pb-28 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
@@ -120,7 +120,7 @@ const Videos: React.FC = () => {
                  <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Daily Progress</span>
               </div>
               <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-800">
-                {currentUser.adsWatchedToday} / {MAX_DAILY_ADS}
+                {currentUser.adsWatchedToday} / {settings.maxDailyAds}
               </span>
            </div>
            <div className="h-4 bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden p-1 border border-gray-100 dark:border-gray-700 shadow-inner">
@@ -135,9 +135,9 @@ const Videos: React.FC = () => {
 
         <button 
            onClick={handleWatchAd}
-           disabled={timeLeft > 0 || currentUser.adsWatchedToday >= MAX_DAILY_ADS || (settings.adsEnabled && isAdBlockerActive)}
+           disabled={timeLeft > 0 || currentUser.adsWatchedToday >= settings.maxDailyAds || (settings.adsEnabled && isAdBlockerActive)}
            className={`w-full py-4 rounded-3xl font-black text-lg shadow-xl transition-all border-b-4 uppercase tracking-widest flex items-center justify-center gap-3 group ${
-             timeLeft > 0 || currentUser.adsWatchedToday >= MAX_DAILY_ADS || (settings.adsEnabled && isAdBlockerActive)
+             timeLeft > 0 || currentUser.adsWatchedToday >= settings.maxDailyAds || (settings.adsEnabled && isAdBlockerActive)
              ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400 cursor-not-allowed grayscale'
              : 'bg-blue-600 border-blue-900 text-white active:scale-95 shadow-blue-500/20'
            }`}
@@ -164,7 +164,7 @@ const Videos: React.FC = () => {
            <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 text-center space-y-0.5">
               <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Reward</p>
               <div className="flex items-center justify-center gap-1">
-                 <span className="text-xs font-black text-gray-900 dark:text-white">{(AD_REWARD_COINS).toFixed(2)}</span>
+                 <span className="text-xs font-black text-gray-900 dark:text-white">{(settings.adRewardCoins).toFixed(2)}</span>
                  <Coins size={10} className="text-yellow-500" />
               </div>
            </div>

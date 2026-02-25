@@ -7,7 +7,7 @@ import {
   Wallet, ArrowRight, Coins, Bell, Pickaxe, Disc, ShieldCheck,
   Award, Trophy, User as UserIcon, Heart, Share2, Flame, Rocket,
   Activity, ArrowUpRight, UserPlus, Target, BarChart3, Layers,
-  Sun, Moon, CloudSun, X, CheckSquare, Fingerprint, Cpu, Scan, 
+  Sun, Moon, CloudSun, X, Fingerprint, Cpu, Scan, 
   ZapOff, Zap as ZapIcon, Globe, ShieldAlert, Terminal, Radio
 } from 'lucide-react';
 import { UserTag, COIN_TO_INR_RATE } from '../types';
@@ -275,31 +275,13 @@ const Dashboard: React.FC = () => {
             <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-gray-400">
                <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
             </div>
-         </div>
-
-         <div 
-          onClick={() => setActiveTab('tasks')}
-          className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
-         >
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-blue-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-blue-500/20 group-hover:scale-110 transition-transform">
-                 <CheckSquare size={36} className="text-white" />
-              </div>
-              <div className="space-y-1">
-                <span className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Daily Tasks</span>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Extra Coin Missions</p>
-              </div>
-            </div>
-            <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-gray-400">
-               <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
-            </div>
-         </div>
+          </div>
       </div>
 
       {/* 5. VIP Monthly Pass - Call to Ascension */}
       {!isPassUser && (
         <div 
-          onClick={() => { playSound('tap'); buyPass(); }} 
+          onClick={() => { playSound('tap'); setActiveTab('pass'); }} 
           className="bg-gray-950 dark:bg-black rounded-[56px] p-10 shadow-4xl relative overflow-hidden group border border-white/10 active:scale-95 transition-all z-10"
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_70%)]" />

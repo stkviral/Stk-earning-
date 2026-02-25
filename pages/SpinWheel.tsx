@@ -18,7 +18,21 @@ const SpinWheel: React.FC = () => {
   const [lastReward, setLastReward] = useState<number | null>(null);
   const [winningSegmentIndex, setWinningSegmentIndex] = useState<number | null>(null);
   const [isAdPending, setIsAdPending] = useState(false);
+  const [cooldownTime, setCooldownTime] = useState(0);
   const wheelRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!currentUser || !settings.spinCooldownMinutes) return;
+    
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const cooldownMs = settings.spinCooldownMinutes * 60 * 1000;
+      const diff = cooldownMs - (now - (currentUser.lastSpinTimestamp || 0));
+      setCooldownTime(Math.max(0, Math.ceil(diff / 1000)));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [currentUser?.lastSpinTimestamp, settings.spinCooldownMinutes]);
 
   if (!currentUser) return null;
 
@@ -52,6 +66,11 @@ const SpinWheel: React.FC = () => {
     }
 
     if (spinning || isWobbling || isAdPending) return;
+
+    if (cooldownTime > 0 && !isUnlimited) {
+      alert(`Spin Cooldown: Please wait ${cooldownTime}s.`);
+      return;
+    }
 
     playSound('tap');
     setLastReward(null);
@@ -99,7 +118,10 @@ const SpinWheel: React.FC = () => {
       const success = addCoins(lastReward!, 'Lucky Spin');
       if (success) {
         playSound('collect');
-        updateUser({ spinsToday: currentUser.spinsToday + 1 });
+        updateUser({ 
+          spinsToday: currentUser.spinsToday + 1,
+          lastSpinTimestamp: Date.now()
+        });
         logActivity(currentUser.id, currentUser.name, 'SPIN_CLAIM', `Claimed ${lastReward} coins from spin`);
         setLastReward(null);
         setWinningSegmentIndex(null);

@@ -11,23 +11,22 @@ export enum UserStatus {
   SUSPENDED = 'SUSPENDED'
 }
 
-export interface Task {
-  id: string;
-  title: string;
-  reward: number;
-  type: 'SYSTEM' | 'CUSTOM';
-  completed: boolean;
-  progress?: number;
-  totalRequired?: number;
-  proof?: string;
-}
-
 export interface Transaction {
   id: string;
   amount: number;
   type: 'EARN' | 'WITHDRAW' | 'ADJUST';
   method: string;
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
+  timestamp: number;
+}
+
+export interface PassRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  proofUrl: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
   timestamp: number;
 }
 
@@ -67,6 +66,7 @@ export interface User {
   miningLastClaimedAt?: number;
   dailyRewardClaimed: boolean;
   spinsToday: number;
+  lastSpinTimestamp: number;
   extraSpinWatchedToday: boolean;
   status: UserStatus;
   walletFrozen: boolean;
@@ -74,7 +74,6 @@ export interface User {
   statusReason?: string;
   statusExpiresAt?: number;
   upiId?: string;
-  tasks: Task[];
   transactions: Transaction[];
   referralHistory: any[];
   passHistory: any[];
@@ -110,9 +109,13 @@ export interface AppSettings {
   miningBoostAdsRequired: number;
   spinRewards: number[];
   maxDailySpinsNormal: number;
+  spinCooldownMinutes: number;
   withdrawalFeeNormal: number;
   minWithdrawalCoins: number;
   withdrawalCooldownHours: number;
+  paymentQrUrl: string;
+  adminUpiId: string;
+  maxDailyAds: number;
 }
 
 export interface AppState {
@@ -123,14 +126,13 @@ export interface AppState {
   settings: AppSettings;
   logs: AdminLog[];
   activityLogs: ActivityLog[];
+  passRequests: PassRequest[];
 }
 
 export const COIN_TO_INR_RATE = 10 / 100;
 export const PASS_PRICE_INR = 49;
 export const AD_GAP_MS = 30000;
 export const MIN_WITHDRAWAL_COINS = 500;
-export const MAX_DAILY_ADS = 20;
-export const AD_REWARD_COINS = 1;
 export const ADMIN_EMAIL = 'admin@stk.com';
 
 declare global {

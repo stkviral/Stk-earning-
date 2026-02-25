@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare, ShieldCheck } from 'lucide-react';
+import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare, ShieldCheck, Crown, User } from 'lucide-react';
 import { useApp } from '../App';
-import { ADMIN_EMAIL } from '../types';
+import { ADMIN_EMAIL, UserTag } from '../types';
 
 interface NavigationProps {
   activeTab: string;
@@ -16,9 +16,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
     const baseTabs = [
       { id: 'home', icon: Home, label: 'Home' },
       { id: 'mining', icon: Pickaxe, label: 'Mining' },
-      { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
-      { id: 'videos', icon: PlayCircle, label: 'Videos' },
       { id: 'wallet', icon: Wallet, label: 'Wallet' },
+      { id: 'profile', icon: User, label: 'Profile' },
     ];
 
     if (state.currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {

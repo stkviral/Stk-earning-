@@ -156,17 +156,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       </div>
 
       <div className="w-full space-y-6 relative z-10">
-        <div className="flex p-1 bg-gray-100 dark:bg-gray-900 rounded-2xl mb-2">
+        <div className="flex p-1.5 bg-gray-100 dark:bg-gray-900 rounded-[24px] mb-2 border border-gray-200 dark:border-gray-800">
           <button 
             onClick={() => setLoginMode('social')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loginMode === 'social' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+            className={`flex-1 py-3.5 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginMode === 'social' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-lg shadow-blue-500/5' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
           >
+            <UserCheck size={14} />
             Social
           </button>
           <button 
             onClick={() => setLoginMode('email')}
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loginMode === 'email' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400'}`}
+            className={`flex-1 py-3.5 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginMode === 'email' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-lg shadow-blue-500/5' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
           >
+            <Mail size={14} />
             Email
           </button>
         </div>
@@ -298,17 +300,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em]">
             Secure & Encrypted
           </p>
-        </div>
-        <div className="flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-900/40 px-6 py-4 rounded-3xl border border-gray-100 dark:border-gray-800/60 shadow-sm">
-          <div className="flex items-center gap-4">
-            <span className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest">
-              STK NETWORK v2.4.0
-            </span>
-            <span className="text-[8px] text-gray-800 dark:text-gray-900">•</span>
-            <span className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest">
-              SECURE NODE
-            </span>
-          </div>
         </div>
       </div>
 

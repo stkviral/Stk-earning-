@@ -112,19 +112,6 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* VIP-ONLY THEME TOGGLE */}
-          {!isAdmin && isVIP && (
-            <div className="flex items-center mr-1">
-               <button 
-                  onClick={() => { playSound('tap'); toggleTheme(); }}
-                  className="p-2 bg-gray-100 dark:bg-white/10 rounded-xl transition-all active:scale-90 text-blue-600 dark:text-yellow-400 border border-gray-200 dark:border-white/10 flex items-center gap-2"
-               >
-                  {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                  <Sparkles size={10} className="animate-pulse" />
-               </button>
-            </div>
-          )}
-
           {!isAdmin && currentUser?.tag === UserTag.PASS && daysLeft !== null && (
             <div className="mr-1 bg-blue-600/20 px-3 py-1.5 rounded-xl flex items-center gap-2 border border-gray-200 dark:border-white/10 shadow-inner">
                <Clock size={12} className="text-yellow-400 animate-pulse" />
@@ -143,22 +130,23 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 <ShieldCheck size={22} />
               </button>
             )}
-            {!isAdmin && (
+            {!isAdmin && isVIP && (
               <button 
-                onClick={() => { playSound('tap'); setActiveTab('faq'); }}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-gray-600 dark:text-white/70"
+                onClick={() => { playSound('tap'); toggleTheme(); }}
+                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-blue-600 dark:text-yellow-400"
               >
-                <HelpCircle size={22} />
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+            )}
+            {!isAdmin && !isVIP && (
+              <button 
+                onClick={() => { playSound('tap'); setActiveTab('pass'); }}
+                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-yellow-500 animate-pulse"
+              >
+                <Crown size={22} fill="currentColor" />
               </button>
             )}
           </div>
-          
-          <button 
-            onClick={() => { playSound('tap'); logout(); }}
-            className="p-2.5 bg-red-500/10 hover:bg-red-500/30 rounded-xl transition-all active:scale-90 text-red-600 dark:text-red-300 ml-1 border border-red-500/20"
-          >
-            <LogOut size={20} />
-          </button>
         </div>
       </div>
     </header>

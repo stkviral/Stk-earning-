@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { 
-  User, UserTag, UserStatus, AppState, Transaction, Task,
-  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL
+  User, UserTag, UserStatus, AppState, Transaction,
+  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL, PassRequest
 } from './types';
 import Dashboard from './pages/Dashboard';
 import Mining from './pages/Mining';
@@ -10,11 +10,12 @@ import SpinWheel from './pages/SpinWheel';
 import Wallet from './pages/Wallet';
 import Referral from './pages/Referral';
 import Videos from './pages/Videos';
-import Tasks from './pages/Tasks';
 import AdminPanel from './pages/AdminPanel';
+import Profile from './pages/Profile';
 import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
+import MonthlyPass from './pages/MonthlyPass';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
@@ -27,13 +28,12 @@ interface AppContextType {
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
   addCoins: (amount: number, method: string) => boolean;
-  addTask: (title: string, reward: number) => void;
-  completeTask: (taskId: string, proof?: string) => Promise<boolean>;
   playAd: (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
   buyPass: () => void;
+  submitPassRequest: (proofUrl: string) => void;
   withdraw: (upiId: string, amount: number) => string | null;
   setActiveTab: (tab: string) => void;
   calculateRiskScore: (user: User) => number;
@@ -48,6 +48,8 @@ interface AppContextType {
     modifyCoins: (userId: string, amount: number) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
+    approvePassRequest: (requestId: string) => void;
+    rejectPassRequest: (requestId: string) => void;
   }
 }
 
@@ -80,9 +82,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   miningBoostAdsRequired: 20,
   spinRewards: [1, 2, 3, 5, 2, 4, 1, 10],
   maxDailySpinsNormal: 5,
+  spinCooldownMinutes: 0,
   withdrawalFeeNormal: 7.5,
   minWithdrawalCoins: 500,
-  withdrawalCooldownHours: 24
+  withdrawalCooldownHours: 24,
+  paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=49&cu=INR",
+  adminUpiId: "stk@upi",
+  maxDailyAds: 20
 };
 
 const App: React.FC = () => {
@@ -97,6 +103,7 @@ const App: React.FC = () => {
       settings: parsed?.settings || DEFAULT_SETTINGS,
       logs: parsed?.logs || [],
       activityLogs: parsed?.activityLogs || [],
+      passRequests: parsed?.passRequests || [],
       isAdBlockerActive: false,
       isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL,
       theme: parsed?.theme || 'dark'
@@ -143,15 +150,18 @@ const App: React.FC = () => {
     return detected;
   }, []);
 
-  // Daily Reset Effect
+  // Daily Reset & Pass Expiry Effect
   useEffect(() => {
     if (!state.currentUser) return;
     const now = Date.now();
     const lastReset = state.currentUser.lastResetTimestamp || 0;
     const dayInMs = 24 * 60 * 60 * 1000;
 
+    const updates: Partial<User> = {};
+
+    // Daily Reset
     if (now - lastReset >= dayInMs) {
-      updateUser({
+      Object.assign(updates, {
         dailyEarned: 0,
         adsWatchedToday: 0,
         spinsToday: 0,
@@ -160,38 +170,20 @@ const App: React.FC = () => {
         lastResetTimestamp: now
       });
     }
-  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp]);
 
-  // Task Synchronization Effect
-  useEffect(() => {
-    if (!state.currentUser || state.isAdminSession) return;
-    const user = state.currentUser;
-    const tasks = [...user.tasks];
-    let changed = false;
-
-    tasks.forEach(task => {
-      if (task.type === 'SYSTEM' && !task.completed) {
-        let newProgress = task.progress || 0;
-        if (task.id === 't1') newProgress = user.adsWatchedToday || 0;
-        if (task.id === 't2') newProgress = user.spinsToday || 0;
-        if (task.id === 't3') newProgress = user.referralHistory?.length || 0;
-
-        if (newProgress !== task.progress) {
-          task.progress = newProgress;
-          changed = true;
-        }
+    // Pass Expiry
+    if (state.currentUser.tag === UserTag.PASS && state.currentUser.passPurchaseTimestamp) {
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      if (now - state.currentUser.passPurchaseTimestamp > thirtyDays) {
+        Object.assign(updates, { tag: UserTag.NORMAL });
+        logActivity(state.currentUser.id, state.currentUser.name, 'PASS_EXPIRED', 'Monthly Pass has expired.');
       }
-    });
-
-    if (changed) {
-      updateUser({ tasks });
     }
-  }, [
-    state.currentUser?.adsWatchedToday, 
-    state.currentUser?.spinsToday, 
-    state.currentUser?.referralHistory?.length,
-    updateUser
-  ]);
+
+    if (Object.keys(updates).length > 0) {
+      updateUser(updates);
+    }
+  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp, state.currentUser?.tag, state.currentUser?.passPurchaseTimestamp]);
 
   useEffect(() => {
     checkAdBlocker();
@@ -245,41 +237,6 @@ const App: React.FC = () => {
     return true;
   }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
 
-  const addTask = useCallback((title: string, reward: number) => {
-    if (!state.currentUser) return;
-    const newTask: Task = {
-      id: Math.random().toString(36).substring(2, 9),
-      title,
-      reward,
-      type: 'CUSTOM',
-      completed: false
-    };
-    updateUser({ tasks: [...state.currentUser.tasks, newTask] });
-  }, [state.currentUser, updateUser]);
-
-  const completeTask = useCallback(async (taskId: string, proof?: string) => {
-    if (!state.currentUser) return false;
-    const task = state.currentUser.tasks.find(t => t.id === taskId);
-    if (!task) return false;
-
-    if (task.type === 'CUSTOM' && proof) {
-      const result = await BackendAI.verifyTaskProof(task, proof);
-      if (!result.success) {
-        alert(`Verification Failed: ${result.reason}`);
-        return false;
-      }
-    }
-
-    const success = addCoins(task.reward, `Task: ${task.title}`);
-    if (success) {
-      updateUser({
-        tasks: state.currentUser.tasks.map(t => t.id === taskId ? { ...t, completed: true, proof } : t)
-      });
-      return true;
-    }
-    return false;
-  }, [state.currentUser, addCoins, updateUser]);
-
   const playAd = useCallback((onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
     if (!state.settings.adsEnabled) { onComplete(); return; }
     if (state.currentUser?.adsBlocked) { 
@@ -298,6 +255,26 @@ const App: React.FC = () => {
     }
     setAdConfig({ type, onComplete });
   }, [state.settings.adsEnabled, state.currentUser?.adsBlocked, state.isAdBlockerActive]);
+
+  const logAdminAction = useCallback((action: string, targetId: string, details: string) => {
+    const newLog: AdminLog = { id: Math.random().toString(36).substring(2, 9), adminId: 'SUPER_ADMIN', action, targetId, details, timestamp: Date.now() };
+    setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
+  }, []);
+
+  const logActivity = useCallback((userId: string, userName: string, action: string, details: string) => {
+    const newLog: ActivityLog = { 
+      id: Math.random().toString(36).substring(2, 9), 
+      userId, 
+      userName, 
+      action, 
+      details, 
+      timestamp: Date.now() 
+    };
+    setState(prev => ({ 
+      ...prev, 
+      activityLogs: [newLog, ...(prev.activityLogs || [])].slice(0, 100) 
+    }));
+  }, []);
 
   const login = (email: string, name: string, referralCode?: string) => {
     const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -319,15 +296,11 @@ const App: React.FC = () => {
         miningClaimed: false,
         dailyRewardClaimed: false,
         spinsToday: 0,
+        lastSpinTimestamp: 0,
         extraSpinWatchedToday: false,
         status: UserStatus.ACTIVE,
         walletFrozen: false,
         adsBlocked: false,
-        tasks: [
-          { id: 't1', title: 'WATCH 5 ADS', reward: 10, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 5 },
-          { id: 't2', title: 'SPIN THE WHEEL 3 TIMES', reward: 15, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 3 },
-          { id: 't3', title: 'INVITE 1 FRIEND', reward: 50, type: 'SYSTEM', completed: false, progress: 0, totalRequired: 1 }
-        ],
         transactions: [],
         referralHistory: [],
         passHistory: [],
@@ -349,8 +322,13 @@ const App: React.FC = () => {
   };
 
   const logout = () => { 
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.disableAutoSelect();
+    console.log("App: logout called");
+    try {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.disableAutoSelect();
+      }
+    } catch (e) {
+      console.warn("Google logout failed", e);
     }
     setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
     setActiveTab('home'); 
@@ -364,6 +342,8 @@ const App: React.FC = () => {
   }, []);
 
   const buyPass = useCallback(() => {
+    // This is now a legacy function or can be used for direct admin grant
+    // We'll keep it for now but the UI will use submitPassRequest
     const confirmBuy = window.confirm("Activate VIP Status? Enjoy zero fees, 2x mining, and custom themes for 30 days.");
     if (!confirmBuy) return;
     setState(prev => {
@@ -379,6 +359,25 @@ const App: React.FC = () => {
     });
     alert("VIP Upgrade Successful! Welcome to the Elite Tier.");
   }, []);
+
+  const submitPassRequest = useCallback((proofUrl: string) => {
+    if (!state.currentUser) return;
+    const newRequest: PassRequest = {
+      id: Math.random().toString(36).substring(2, 9),
+      userId: state.currentUser.id,
+      userName: state.currentUser.name,
+      userEmail: state.currentUser.email,
+      proofUrl,
+      status: 'PENDING',
+      timestamp: Date.now()
+    };
+    setState(prev => ({
+      ...prev,
+      passRequests: [newRequest, ...prev.passRequests]
+    }));
+    logActivity(state.currentUser.id, state.currentUser.name, 'PASS_REQUEST', 'Submitted a VIP pass purchase request');
+    alert("Request Submitted! Admin will verify your payment soon.");
+  }, [state.currentUser, logActivity]);
 
   const withdraw = (upiId: string, amount: number): string | null => {
     if (!state.currentUser) return "User session error";
@@ -398,26 +397,6 @@ const App: React.FC = () => {
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(amount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId}`);
     return null;
   };
-
-  const logAdminAction = useCallback((action: string, targetId: string, details: string) => {
-    const newLog: AdminLog = { id: Math.random().toString(36).substring(2, 9), adminId: 'SUPER_ADMIN', action, targetId, details, timestamp: Date.now() };
-    setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
-  }, []);
-
-  const logActivity = useCallback((userId: string, userName: string, action: string, details: string) => {
-    const newLog: ActivityLog = { 
-      id: Math.random().toString(36).substring(2, 9), 
-      userId, 
-      userName, 
-      action, 
-      details, 
-      timestamp: Date.now() 
-    };
-    setState(prev => ({ 
-      ...prev, 
-      activityLogs: [newLog, ...(prev.activityLogs || [])].slice(0, 100) 
-    }));
-  }, []);
 
   const adminActions = {
     approveWithdrawal: (userId: string, txId: string) => {
@@ -476,6 +455,40 @@ const App: React.FC = () => {
       if (!user) return alert("User not found!");
       setState(prev => ({ ...prev, currentUser: user }));
       setActiveTab('home');
+    },
+    approvePassRequest: (requestId: string) => {
+      setState(prev => {
+        const request = prev.passRequests.find(r => r.id === requestId);
+        if (!request) return prev;
+        
+        const now = Date.now();
+        const newAllUsers = prev.allUsers.map(u => {
+          if (u.id !== request.userId) return u;
+          return {
+            ...u,
+            tag: UserTag.PASS,
+            passPurchaseTimestamp: now,
+            passHistory: [{ date: now, type: 'PURCHASE', requestId }, ...(u.passHistory || [])]
+          };
+        });
+        
+        const updatedUser = newAllUsers.find(u => u.id === request.userId);
+        
+        return {
+          ...prev,
+          allUsers: newAllUsers,
+          currentUser: prev.currentUser?.id === request.userId ? (updatedUser || null) : prev.currentUser,
+          passRequests: prev.passRequests.map(r => r.id === requestId ? { ...r, status: 'APPROVED' } : r)
+        };
+      });
+      logAdminAction('PASS_APPROVE', requestId, `Approved pass request for ${requestId}`);
+    },
+    rejectPassRequest: (requestId: string) => {
+      setState(prev => ({
+        ...prev,
+        passRequests: prev.passRequests.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r)
+      }));
+      logAdminAction('PASS_REJECT', requestId, `Rejected pass request for ${requestId}`);
     }
   };
 
@@ -511,7 +524,8 @@ const App: React.FC = () => {
     }
     if (activeTab === 'privacy') return <PrivacyPolicy />;
     if (activeTab === 'faq') return <FAQ />;
-    if (activeTab === 'tasks') return <Tasks />;
+    if (activeTab === 'pass') return <MonthlyPass />;
+    if (activeTab === 'profile') return <Profile />;
     switch (activeTab) {
       case 'home': return <Dashboard />;
       case 'mining': return <Mining />;
@@ -525,8 +539,8 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={{
-      state, updateUser, updateLogo, updateSettings, addCoins, addTask, completeTask, playAd, login, logout, 
-      toggleTheme, buyPass, withdraw, setActiveTab, calculateRiskScore: () => 0,
+      state, updateUser, updateLogo, updateSettings, addCoins, playAd, login, logout, 
+      toggleTheme, buyPass, submitPassRequest, withdraw, setActiveTab, calculateRiskScore: () => 0,
       checkAdBlocker, logAdminAction, logActivity, adminActions
     }}>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-white dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
