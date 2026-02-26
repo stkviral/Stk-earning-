@@ -353,15 +353,40 @@ const AdminPanel: React.FC = () => {
                       u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                       u.email.toLowerCase().includes(searchTerm.toLowerCase())
                     ).map(u => (
-                      <div key={u.id} onClick={() => setViewingUserId(u.id)} className="bg-gray-900 p-5 rounded-[40px] border border-gray-800 flex items-center justify-between shadow-xl active:scale-95 transition-all">
-                        <div className="flex items-center gap-4">
-                          <img src={u.avatar} className="w-12 h-12 rounded-2xl border border-gray-800" />
-                          <div>
-                            <p className="text-sm font-black italic">{u.name}</p>
-                            <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${u.status === UserStatus.ACTIVE ? 'text-blue-400' : 'text-red-500'}`}>{u.status}</p>
+                      <div key={u.id} className="bg-gray-900 p-5 rounded-[40px] border border-gray-800 flex flex-col gap-4 shadow-xl transition-all">
+                        <div className="flex items-center justify-between cursor-pointer active:scale-95" onClick={() => setViewingUserId(u.id)}>
+                          <div className="flex items-center gap-4">
+                            <img src={u.avatar} className="w-12 h-12 rounded-2xl border border-gray-800" />
+                            <div>
+                              <p className="text-sm font-black italic">{u.name}</p>
+                              <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${u.status === UserStatus.ACTIVE ? 'text-blue-400' : 'text-red-500'}`}>{u.status}</p>
+                            </div>
                           </div>
+                          <ChevronRight className="text-gray-700" />
                         </div>
-                        <ChevronRight className="text-gray-700" />
+                        <div className="flex gap-2 pt-4 border-t border-gray-800">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adminActions.updateUserSettings(u.id, { walletFrozen: !u.walletFrozen });
+                            }}
+                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${u.walletFrozen ? 'bg-blue-600/20 text-blue-500 border border-blue-600/30' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                          >
+                            <Lock size={12} /> {u.walletFrozen ? 'Unfreeze' : 'Freeze'}
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newStatus = u.status === UserStatus.BANNED ? UserStatus.ACTIVE : UserStatus.BANNED;
+                              if (window.confirm(`Are you sure you want to ${newStatus === UserStatus.BANNED ? 'ban' : 'unban'} ${u.name}?`)) {
+                                adminActions.setUserStatus(u.id, newStatus, 'Quick Action');
+                              }
+                            }}
+                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${u.status === UserStatus.BANNED ? 'bg-red-600/20 text-red-500 border border-red-600/30' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                          >
+                            <Ban size={12} /> {u.status === UserStatus.BANNED ? 'Unban' : 'Ban'}
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}

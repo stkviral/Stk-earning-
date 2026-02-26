@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useAnimation } from 'motion/react';
 import { useApp } from '../App';
 import { 
   ArrowUpRight, 
@@ -165,7 +165,7 @@ const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
 };
 
 const Wallet: React.FC = () => {
-  const { state, withdraw, setActiveTab } = useApp();
+  const { state, withdraw, setActiveTab, updateUser } = useApp();
   const { currentUser, settings } = state;
   const [upiId, setUpiId] = useState(currentUser?.upiId || '');
   const [withdrawAmount, setWithdrawAmount] = useState<number | string>(500);
@@ -174,6 +174,37 @@ const Wallet: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUpiValid, setIsUpiValid] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
+  const balanceControls = useAnimation();
+  const prevCoins = useRef(currentUser?.coins);
+
+  useEffect(() => {
+    if (currentUser && prevCoins.current !== undefined && currentUser.coins !== prevCoins.current) {
+      const isIncrease = currentUser.coins > prevCoins.current;
+      balanceControls.start({
+        scale: [1, 1.05, 1],
+        color: isIncrease ? ['#ffffff', '#4ade80', '#ffffff'] : ['#ffffff', '#f87171', '#ffffff'],
+        transition: { duration: 0.5 }
+      });
+      prevCoins.current = currentUser.coins;
+    } else if (currentUser && prevCoins.current === undefined) {
+      prevCoins.current = currentUser.coins;
+    }
+  }, [currentUser?.coins, balanceControls]);
+
+  // Ensure user data is synced/fetched immediately upon component mount
+  useEffect(() => {
+    if (currentUser) {
+      // Trigger a state sync to ensure we have the most up-to-date transaction data
+      updateUser({});
+      // Simulate network delay for fetching transactions
+      const timer = setTimeout(() => {
+        setIsLoadingTransactions(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
     const upiRegex = /^[\w\.-]+@[\w\.-]+$/;
@@ -235,10 +266,12 @@ const Wallet: React.FC = () => {
   };
 
   const filteredTransactions = useMemo(() => {
-    return currentUser.transactions.filter(tx => {
-      if (filter === 'ALL') return true;
-      return tx.type === filter;
-    });
+    return [...currentUser.transactions]
+      .filter(tx => {
+        if (filter === 'ALL') return true;
+        return tx.type === filter;
+      })
+      .sort((a, b) => b.timestamp - a.timestamp);
   }, [currentUser.transactions, filter]);
 
   return (
@@ -275,17 +308,17 @@ const Wallet: React.FC = () => {
               <div className="space-y-3">
                 <p className="text-[9px] font-black text-blue-300 uppercase tracking-[0.5em] opacity-60">Total Balance</p>
                 <div className="flex flex-col">
-                  <div className="flex items-baseline gap-3">
+                  <motion.div animate={balanceControls} className="flex items-baseline gap-3">
                     <span className="text-sm font-black text-blue-400 italic">₹</span>
-                    <span className="text-5xl font-black text-white tracking-tighter italic tabular-nums leading-none">
+                    <span className="text-5xl font-black tracking-tighter italic tabular-nums leading-none">
                       {currentBalanceINR.toFixed(0)}<span className="text-2xl opacity-30">.{currentBalanceINR.toFixed(2).split('.')[1]}</span>
                     </span>
-                  </div>
+                  </motion.div>
                   <div className="flex items-center gap-3 mt-6">
-                    <div className="bg-white/5 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/10 flex items-center gap-2.5 shadow-inner">
+                    <motion.div animate={balanceControls} className="bg-white/5 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/10 flex items-center gap-2.5 shadow-inner">
                       <Coins size={14} className="text-yellow-400" />
-                      <span className="text-[11px] font-black text-white uppercase tracking-tighter tabular-nums">{currentUser.coins.toLocaleString()} COINS</span>
-                    </div>
+                      <span className="text-[11px] font-black uppercase tracking-tighter tabular-nums">{currentUser.coins.toLocaleString()} COINS</span>
+                    </motion.div>
                     {isPass && (
                       <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-blue-950 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-xl shadow-yellow-500/20 animate-in zoom-in-50 duration-500">
                          <Crown size={12} fill="currentColor" />
@@ -526,7 +559,20 @@ const Wallet: React.FC = () => {
           className="space-y-4"
         >
           <AnimatePresence mode="popLayout">
-            {filteredTransactions.length === 0 ? (
+            {isLoadingTransactions ? (
+              <motion.div 
+                key="loading"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="text-center py-20 bg-white dark:bg-gray-900 rounded-[48px] border-2 border-dashed border-gray-100 dark:border-gray-800 flex flex-col items-center"
+              >
+                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-[32px] flex items-center justify-center mb-5">
+                  <Loader2 size={40} className="text-blue-500 animate-spin" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500 animate-pulse">Syncing Ledger...</p>
+              </motion.div>
+            ) : filteredTransactions.length === 0 ? (
               <motion.div 
                 key="empty"
                 initial={{ opacity: 0, scale: 0.9 }}
