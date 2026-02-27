@@ -133,14 +133,18 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white/5 backdrop-blur-2xl px-5 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3 shadow-inner">
+                  <div className="flex flex-wrap items-center gap-3 mt-4">
+                    <div className="bg-white/5 backdrop-blur-2xl px-4 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-inner">
                       <Coins size={16} className="text-yellow-400" />
-                      <span className="text-[12px] font-black text-white uppercase tracking-widest tabular-nums">{currentUser.coins.toLocaleString()} Coins</span>
+                      <span className="text-[11px] font-black text-white uppercase tracking-widest tabular-nums">{currentUser.coins.toLocaleString()} Coins</span>
+                    </div>
+                    <div className="bg-white/5 backdrop-blur-2xl px-4 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-inner">
+                      <TrendingUp size={16} className="text-green-400" />
+                      <span className="text-[11px] font-black text-white uppercase tracking-widest tabular-nums">+{currentUser.dailyEarned.toLocaleString()} Today</span>
                     </div>
                     {isPassUser && (
                       <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-[1px] rounded-2xl shadow-xl shadow-yellow-500/20">
-                         <div className="bg-gray-950 px-4 py-2 rounded-[15px] flex items-center gap-2">
+                         <div className="bg-gray-950 px-3 py-2 rounded-[15px] flex items-center gap-2">
                             <Crown size={12} fill="#fbbf24" className="text-yellow-400" />
                             <span className="text-[9px] font-black text-yellow-400 uppercase italic">ELITE</span>
                          </div>
@@ -181,22 +185,22 @@ const Dashboard: React.FC = () => {
         {/* EXTRACTION HUB (MINING) */}
         <div 
           onClick={() => { playSound('tap'); setActiveTab('mining'); }}
-          className="group bg-white dark:bg-gray-900 rounded-[44px] p-6 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
+          className="group bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 rounded-[44px] p-6 shadow-xl border border-blue-100 dark:border-gray-700 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
         >
-          <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.03] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700 pointer-events-none">
+          <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.05] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700 pointer-events-none">
              <Pickaxe size={180} />
           </div>
           
-          <div className={`w-20 h-20 rounded-[32px] flex items-center justify-center shadow-2xl transition-all duration-500 ${isMiningActive ? 'bg-blue-600 text-white shadow-blue-500/40 animate-pulse' : 'bg-gray-50 dark:bg-gray-800 text-blue-500'}`}>
+          <div className={`w-20 h-20 rounded-[32px] flex items-center justify-center shadow-2xl transition-all duration-500 ${isMiningActive ? 'bg-blue-600 text-white shadow-blue-500/40 animate-pulse' : 'bg-white dark:bg-gray-800 text-blue-500 shadow-blue-500/10'}`}>
              <Pickaxe size={40} className={isMiningActive ? 'animate-pickaxe' : 'group-hover:rotate-12 transition-transform'} />
           </div>
           
           <div className="space-y-1 relative z-10">
-             <h4 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Mining</h4>
-             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Automated Earnings</p>
+             <h4 className="text-xl font-black uppercase italic tracking-tighter text-blue-900 dark:text-blue-100">Mining</h4>
+             <p className="text-[9px] font-black text-blue-600/60 dark:text-blue-400/60 uppercase tracking-widest leading-none">Automated Earnings</p>
           </div>
 
-          <div className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border ${isMiningActive ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-gray-50 dark:bg-gray-800 text-gray-400 border-gray-100 dark:border-gray-700'}`}>
+          <div className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border ${isMiningActive ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' : 'bg-white/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700'}`}>
              <Activity size={12} className={isMiningActive ? 'animate-pulse' : ''} /> {isMiningActive ? 'Active' : 'Standby'}
           </div>
         </div>
@@ -204,22 +208,22 @@ const Dashboard: React.FC = () => {
         {/* FORTUNE HUB (SPIN) */}
         <div 
           onClick={() => { playSound('tap'); setActiveTab('spin'); }}
-          className="group bg-white dark:bg-gray-900 rounded-[44px] p-6 shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
+          className="group bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 rounded-[44px] p-6 shadow-xl border border-orange-100 dark:border-gray-700 flex flex-col items-center text-center gap-4 active:scale-95 transition-all relative overflow-hidden"
         >
-          <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.03] group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-700 pointer-events-none">
+          <div className="absolute top-[-20%] right-[-20%] p-4 opacity-[0.05] group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-700 pointer-events-none">
              <Disc size={180} />
           </div>
 
-          <div className="w-20 h-20 bg-orange-600 text-white rounded-[32px] flex items-center justify-center shadow-2xl shadow-orange-500/30 group-hover:scale-110 transition-all duration-500">
+          <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-[32px] flex items-center justify-center shadow-2xl shadow-orange-500/30 group-hover:scale-110 transition-all duration-500">
              <Disc size={40} className="animate-spin-slow" />
           </div>
 
           <div className="space-y-1 relative z-10">
-             <h4 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Lucky Spin</h4>
-             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Win Big Rewards</p>
+             <h4 className="text-xl font-black uppercase italic tracking-tighter text-orange-900 dark:text-orange-100">Lucky Spin</h4>
+             <p className="text-[9px] font-black text-orange-600/60 dark:text-orange-400/60 uppercase tracking-widest leading-none">Win Big Rewards</p>
           </div>
 
-          <div className="px-5 py-2 bg-orange-500/10 text-orange-600 border border-orange-500/20 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+          <div className="px-5 py-2 bg-white/50 dark:bg-gray-800/50 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/50 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
              <ZapIcon size={12} fill="currentColor" /> {isPassUser ? '∞ TURNS' : `${settings.maxDailySpinsNormal - currentUser.spinsToday} LEFT`}
           </div>
         </div>
