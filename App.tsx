@@ -16,6 +16,7 @@ import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
 import MonthlyPass from './pages/MonthlyPass';
+import Leaderboard from './pages/Leaderboard';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
@@ -533,6 +534,7 @@ const App: React.FC = () => {
       case 'wallet': return <Wallet />;
       case 'invite': return <Referral />;
       case 'videos': return <Videos />;
+      case 'leaderboard': return <Leaderboard />;
       default: return <Dashboard />;
     }
   };

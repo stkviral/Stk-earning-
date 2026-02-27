@@ -40,10 +40,11 @@ type TransactionFilter = 'ALL' | 'EARN' | 'WITHDRAW';
 const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
   const [showDetails, setShowDetails] = useState(false);
   
-  const isWithdraw = tx.type === 'WITHDRAW';
+  const isWithdraw = tx.type === 'WITHDRAW' || (tx.type === 'ADJUST' && tx.amount < 0);
   const isCompleted = tx.status === 'COMPLETED';
   const isPending = tx.status === 'PENDING';
   const isRejected = tx.status === 'REJECTED';
+  const displayAmount = Math.abs(tx.amount);
 
   const progressSteps = [
     { label: 'Submitted', done: true, time: 'Instant' },
@@ -92,7 +93,7 @@ const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
         </div>
         <div className="text-right">
           <span className={`text-lg font-black tracking-tighter tabular-nums ${isWithdraw ? 'text-red-600' : 'text-green-600'}`}>
-            {isWithdraw ? '-' : '+'} {tx.amount.toLocaleString()}
+            {isWithdraw ? '-' : '+'} {displayAmount.toLocaleString()}
           </span>
           <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">STK Coins</p>
         </div>
@@ -117,7 +118,7 @@ const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[7px] font-black text-gray-400 uppercase tracking-[0.2em]">Cash Value</p>
-                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter italic">₹{(tx.amount * COIN_TO_INR_RATE).toFixed(2)}</p>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter italic">₹{(displayAmount * COIN_TO_INR_RATE).toFixed(2)}</p>
                 </div>
               </div>
 
@@ -170,11 +171,14 @@ const Wallet: React.FC = () => {
   const [upiId, setUpiId] = useState(currentUser?.upiId || '');
   const [withdrawAmount, setWithdrawAmount] = useState<number | string>(500);
   const [filter, setFilter] = useState<TransactionFilter>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUpiValid, setIsUpiValid] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
+  const ITEMS_PER_PAGE = 10;
 
   const balanceControls = useAnimation();
   const prevCoins = useRef(currentUser?.coins);
@@ -269,10 +273,23 @@ const Wallet: React.FC = () => {
     return [...currentUser.transactions]
       .filter(tx => {
         if (filter === 'ALL') return true;
+        if (filter === 'EARN') return tx.type === 'EARN' || (tx.type === 'ADJUST' && tx.amount > 0);
         return tx.type === filter;
       })
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [currentUser.transactions, filter]);
+
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredTransactions.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredTransactions, currentPage]);
+
+  const handleFilterChange = (f: TransactionFilter) => {
+    playSound('tap');
+    setFilter(f);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="p-4 space-y-6 pb-32 animate-in fade-in duration-1000 bg-gray-50 dark:bg-gray-950 min-h-full overflow-hidden transition-colors">
@@ -542,13 +559,13 @@ const Wallet: React.FC = () => {
               <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter italic leading-none">History Logs</h3>
            </div>
            <div className="flex gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-              {(['ALL', 'WITHDRAW'] as TransactionFilter[]).map(f => (
+              {(['ALL', 'EARN', 'WITHDRAW'] as TransactionFilter[]).map(f => (
                 <button 
                   key={f} 
-                  onClick={() => { playSound('tap'); setFilter(f); }}
-                  className={`text-[9px] font-black uppercase px-5 py-3 rounded-xl transition-all duration-500 ${filter === f ? 'bg-blue-600 text-white shadow-lg scale-105' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                  onClick={() => handleFilterChange(f)}
+                  className={`text-[9px] font-black uppercase px-4 py-3 rounded-xl transition-all duration-500 ${filter === f ? 'bg-blue-600 text-white shadow-lg scale-105' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 >
-                  {f === 'ALL' ? 'Everything' : 'Payouts'}
+                  {f === 'ALL' ? 'All' : f === 'EARN' ? 'Earn' : 'Payouts'}
                 </button>
               ))}
            </div>
@@ -586,9 +603,33 @@ const Wallet: React.FC = () => {
                 <p className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-400">Zero Node Activity</p>
               </motion.div>
             ) : (
-              filteredTransactions.slice(0, 30).map((tx, index) => (
-                <TransactionItem key={tx.id} tx={tx} />
-              ))
+              <>
+                {paginatedTransactions.map((tx, index) => (
+                  <TransactionItem key={tx.id} tx={tx} />
+                ))}
+                
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 px-2">
+                    <button 
+                      onClick={() => { playSound('tap'); setCurrentPage(p => Math.max(1, p - 1)); }}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button 
+                      onClick={() => { playSound('tap'); setCurrentPage(p => Math.min(totalPages, p + 1)); }}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </AnimatePresence>
         </motion.div>
