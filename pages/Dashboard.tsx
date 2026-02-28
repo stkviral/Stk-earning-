@@ -115,61 +115,61 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Cinematic Asset Vault Card */}
-        <div className="relative group overflow-hidden rounded-[32px] shadow-3xl transition-all duration-700 border border-white/20 dark:border-white/5">
-           <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-blue-950 to-indigo-950" />
-           <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-           <div className="absolute inset-0 w-full h-[1px] bg-blue-500/40 animate-holo-scan z-20 pointer-events-none shadow-[0_0_15px_#3b82f6]" />
+        <div className="relative group overflow-hidden rounded-[40px] shadow-2xl transition-all duration-700 border border-white/20 dark:border-white/5 bg-white dark:bg-gray-900">
+           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 opacity-10 dark:opacity-20" />
+           <div className="absolute top-[-50%] right-[-50%] w-[100%] h-[200%] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_50%)] animate-spin-slow pointer-events-none" />
            
-           <div className="relative z-10 p-6 space-y-8">
-              <div className="flex justify-between items-start">
-                <div className="space-y-4">
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.5em] opacity-80">Available Balance</p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-black text-blue-400 italic">₹</span>
-                      <span className="text-5xl font-black text-white tracking-tighter italic tabular-nums leading-none">
-                        {(currentUser.coins * COIN_TO_INR_RATE).toFixed(0)}<span className="text-xl opacity-30">.{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2).split('.')[1]}</span>
-                      </span>
-                    </div>
+           <div className="relative z-10 p-8 space-y-8">
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800/50">
+                  <Wallet size={12} className="text-blue-600 dark:text-blue-400" />
+                  <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em]">Total Balance</span>
+                </div>
+                
+                <div className="flex items-baseline justify-center gap-2">
+                  <span className="text-2xl font-black text-gray-400 dark:text-gray-500 italic">₹</span>
+                  <span className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter italic tabular-nums leading-none drop-shadow-sm">
+                    {(currentUser.coins * COIN_TO_INR_RATE).toFixed(0)}<span className="text-2xl opacity-40">.{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2).split('.')[1]}</span>
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-[24px] border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 shadow-inner">
+                  <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                    <Coins size={20} className="text-yellow-600 dark:text-yellow-500" />
                   </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3 mt-4">
-                    <div className="bg-white/5 backdrop-blur-2xl px-4 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-inner">
-                      <Coins size={16} className="text-yellow-400" />
-                      <span className="text-[11px] font-black text-white uppercase tracking-widest tabular-nums">{currentUser.coins.toLocaleString()} Coins</span>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-2xl px-4 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-inner">
-                      <TrendingUp size={16} className="text-green-400" />
-                      <span className="text-[11px] font-black text-white uppercase tracking-widest tabular-nums">+{currentUser.dailyEarned.toLocaleString()} Today</span>
-                    </div>
-                    {isPassUser && (
-                      <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-[1px] rounded-2xl shadow-xl shadow-yellow-500/20">
-                         <div className="bg-gray-950 px-3 py-2 rounded-[15px] flex items-center gap-2">
-                            <Crown size={12} fill="#fbbf24" className="text-yellow-400" />
-                            <span className="text-[9px] font-black text-yellow-400 uppercase italic">ELITE</span>
-                         </div>
-                      </div>
-                    )}
+                  <div className="text-center">
+                    <p className="text-lg font-black text-gray-900 dark:text-white tabular-nums leading-none">{currentUser.coins.toLocaleString()}</p>
+                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">STK Coins</p>
                   </div>
                 </div>
-                <div className="w-16 h-16 bg-white/5 backdrop-blur-3xl rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-700">
-                   <Fingerprint className="text-blue-400 opacity-60" size={32} />
+                
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-[24px] border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 shadow-inner relative overflow-hidden">
+                  {isPassUser && <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-orange-500/10" />}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isPassUser ? 'bg-yellow-400 text-white shadow-lg shadow-yellow-500/30' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500'}`}>
+                    {isPassUser ? <Crown size={20} /> : <TrendingUp size={20} />}
+                  </div>
+                  <div className="text-center relative z-10">
+                    <p className="text-lg font-black text-gray-900 dark:text-white tabular-nums leading-none">+{currentUser.dailyEarned.toLocaleString()}</p>
+                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Earned Today</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-black/40 backdrop-blur-3xl p-6 rounded-[36px] border border-white/5 space-y-5">
+              <div className="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-[28px] border border-blue-100 dark:border-blue-800/30 space-y-4">
                  <div className="flex justify-between items-end px-1">
-                    <div className="flex items-center gap-3">
-                       <Cpu size={14} className="text-blue-300 animate-pulse" />
-                       <span className="text-[10px] font-black text-blue-200/60 uppercase tracking-widest">Network Synchronization</span>
+                    <div className="flex items-center gap-2">
+                       <Activity size={14} className="text-blue-500 animate-pulse" />
+                       <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Daily Capacity</span>
                     </div>
-                    <span className="text-[10px] font-black text-blue-400 uppercase italic tracking-tighter">
-                       {isPassUser ? 'UNLIMITED ACCESS' : `${Math.floor(progressPercent)}% CAPACITY`}
+                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase italic tracking-tighter">
+                       {isPassUser ? 'UNLIMITED' : `${Math.floor(progressPercent)}% USED`}
                     </span>
                  </div>
-                 <div className="h-4 bg-gray-900 rounded-full overflow-hidden p-1 border border-white/5 shadow-inner">
+                 <div className="h-3 bg-blue-100 dark:bg-gray-900 rounded-full overflow-hidden p-0.5 border border-blue-200 dark:border-gray-800 shadow-inner">
                     <div 
-                      className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${isPassUser ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]'}`} 
+                      className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${isPassUser ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'}`} 
                       style={{ width: `${Math.min(100, progressPercent)}%` }} 
                     >
                        <div className="absolute inset-0 animate-shimmer-wave bg-gradient-to-r from-transparent via-white/40 to-transparent" />
@@ -235,27 +235,27 @@ const Dashboard: React.FC = () => {
         className={`relative z-10 p-6 rounded-[40px] border-2 transition-all active:scale-[0.98] group overflow-hidden ${
           currentUser.dailyRewardClaimed 
           ? 'bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 opacity-60' 
-          : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-500/30 shadow-2xl'
+          : 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-500/30 shadow-2xl'
         }`}
       >
         {!currentUser.dailyRewardClaimed && (
-           <div className="absolute inset-0 bg-green-500/5 animate-pulse" />
+           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.1),transparent_70%)] animate-pulse" />
         )}
         <div className="flex items-center justify-between relative z-10">
-           <div className="flex items-center gap-6">
+           <div className="flex items-center gap-5">
               <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center shadow-xl transition-all duration-500 group-hover:rotate-12 ${
-                currentUser.dailyRewardClaimed ? 'bg-gray-200 text-gray-400' : 'bg-green-600 text-white shadow-green-500/30'
+                currentUser.dailyRewardClaimed ? 'bg-gray-200 dark:bg-gray-800 text-gray-400' : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-green-500/30'
               }`}>
                 <Gift size={32} className={currentUser.dailyRewardClaimed ? '' : 'animate-bounce'} />
               </div>
               <div className="space-y-1">
-                <h4 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Daily Reward</h4>
-                <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-                  {currentUser.dailyRewardClaimed ? `Next Reward in: ${timeLeft}` : `Claim +${settings.dailyBonusReward} STK Coins`}
+                <h4 className={`text-xl font-black uppercase italic tracking-tighter ${currentUser.dailyRewardClaimed ? 'text-gray-500 dark:text-gray-400' : 'text-green-900 dark:text-green-100'}`}>Daily Reward</h4>
+                <p className={`text-[10px] font-black uppercase tracking-widest ${currentUser.dailyRewardClaimed ? 'text-gray-400 dark:text-gray-500' : 'text-green-600/80 dark:text-green-400/80'}`}>
+                  {currentUser.dailyRewardClaimed ? `Next in: ${timeLeft}` : `Claim +${settings.dailyBonusReward} STK`}
                 </p>
               </div>
            </div>
-           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${currentUser.dailyRewardClaimed ? 'bg-gray-200 text-gray-400' : 'bg-green-50 dark:bg-green-950 text-green-600'}`}>
+           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${currentUser.dailyRewardClaimed ? 'bg-gray-200 dark:bg-gray-800 text-gray-400' : 'bg-white dark:bg-green-900/40 text-green-600 dark:text-green-400 shadow-sm'}`}>
               {currentUser.dailyRewardClaimed ? <CheckCircle2 size={24} /> : <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />}
            </div>
         </div>
@@ -265,18 +265,18 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 relative z-10">
          <div 
           onClick={() => setActiveTab('videos')}
-          className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border border-gray-100 dark:border-gray-800 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
+          className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-6 rounded-[40px] border border-purple-100 dark:border-purple-900/30 flex items-center justify-between active:scale-95 transition-all group shadow-lg"
          >
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-red-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-red-500/20 group-hover:scale-110 transition-transform">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-[28px] flex items-center justify-center shadow-xl shadow-purple-500/20 group-hover:scale-110 transition-transform">
                  <PlayCircle size={36} fill="currentColor" className="text-white" />
               </div>
               <div className="space-y-1">
-                <span className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">Watch & Earn</span>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Instant STK Rewards</p>
+                <span className="text-xl font-black uppercase italic tracking-tighter text-purple-900 dark:text-purple-100">Watch & Earn</span>
+                <p className="text-[10px] font-black text-purple-600/60 dark:text-purple-400/60 uppercase tracking-widest">Instant STK Rewards</p>
               </div>
             </div>
-            <div className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-gray-400">
+            <div className="w-12 h-12 bg-white/50 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400">
                <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
             </div>
           </div>

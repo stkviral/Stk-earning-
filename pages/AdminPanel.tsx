@@ -42,20 +42,30 @@ const NavItem = ({ tab, icon: Icon, label, activeTab, setActiveTab, setViewingUs
 );
 
 const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, onBack }) => {
-  const { state, adminActions } = useApp();
-  const [activeTab, setActiveTab] = useState<'activity' | 'edit' | 'referrals' | 'logs'>('activity');
+  const { state, adminActions, calculateRiskScore } = useApp();
+  const [activeTab, setActiveTab] = useState<'activity' | 'edit' | 'security' | 'referrals' | 'logs'>('activity');
   const [coinAdjustment, setCoinAdjustment] = useState('');
   const [actionReason, setActionReason] = useState('');
   
   const [editName, setEditName] = useState(user.name);
   const [editTag, setEditTag] = useState<UserTag>(user.tag);
 
+  const currentRiskScore = useMemo(() => calculateRiskScore(user), [user, calculateRiskScore]);
+
   const handleAdjustCoins = (type: 'ADD' | 'REMOVE') => {
     const amount = parseInt(coinAdjustment);
     if (isNaN(amount) || amount <= 0) return alert("Enter valid amount");
     if (!actionReason) return alert("Reason is required");
-    adminActions.modifyCoins(user.id, type === 'ADD' ? amount : -amount);
+    adminActions.modifyCoins(user.id, type === 'ADD' ? amount : -amount, actionReason);
     setCoinAdjustment('');
+    setActionReason('');
+  };
+
+  const handleResetCooldown = (type: 'MINING' | 'SPIN' | 'ALL') => {
+    if (!actionReason) return alert("Reason is required");
+    adminActions.resetCooldowns(user.id, type, actionReason);
+    setActionReason('');
+    alert(`${type} cooldown reset successfully.`);
   };
 
   const handleUpdateProfile = () => {
@@ -108,10 +118,10 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-[32px] p-2 flex">
-        {(['activity', 'edit', 'referrals', 'logs'] as const).map(t => (
+        {(['activity', 'edit', 'security', 'referrals', 'logs'] as const).map(t => (
           <button
             key={t}
-            onClick={() => setActiveTab(t)}
+            onClick={() => setActiveTab(t as any)}
             className={`flex-1 py-3 rounded-2xl text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
           >
             {t}
@@ -129,6 +139,10 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                 <input type="number" placeholder="Amt" value={coinAdjustment || ''} onChange={e => setCoinAdjustment(e.target.value)} className="flex-1 bg-gray-900 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none" />
                 <button onClick={() => handleAdjustCoins('ADD')} className="bg-green-600 px-4 rounded-xl text-white"><Plus size={18} /></button>
                 <button onClick={() => handleAdjustCoins('REMOVE')} className="bg-red-600 px-4 rounded-xl text-white"><Minus size={18} /></button>
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-gray-800">
+                <button onClick={() => handleResetCooldown('MINING')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Mining</button>
+                <button onClick={() => handleResetCooldown('SPIN')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Spin</button>
               </div>
             </div>
 
@@ -219,13 +233,145 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
             </div>
           </div>
         )}
+        {activeTab === 'security' && (
+          <div className="space-y-6">
+            <div className="bg-gray-950 p-6 rounded-[32px] border border-gray-800 space-y-4">
+               <div className="flex items-center gap-3">
+                  <ShieldOff className="text-red-500" size={20} />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white">Fraud Detection</h3>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800">
+                     <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Device ID</p>
+                     <p className="text-xs font-mono text-white mt-1">{user.deviceId || 'N/A'}</p>
+                  </div>
+                  <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800">
+                     <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Last IP</p>
+                     <p className="text-xs font-mono text-white mt-1">{user.lastIp || 'N/A'}</p>
+                  </div>
+               </div>
+               <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800 flex items-center justify-between">
+                  <div>
+                     <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Risk Score</p>
+                     <p className={`text-xl font-black mt-1 ${currentRiskScore > 70 ? 'text-red-500' : 'text-green-500'}`}>{currentRiskScore}/100</p>
+                  </div>
+                  {currentRiskScore > 70 && (
+                     <div className="bg-red-500/10 text-red-500 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-500/20">
+                        High Risk
+                     </div>
+                  )}
+               </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
+const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setViewingUserId }) => {
+  const { state, adminActions } = useApp();
+  const [filter, setFilter] = useState<'PENDING' | 'COMPLETED' | 'REJECTED'>('PENDING');
+  const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+  const [paymentTxId, setPaymentTxId] = useState<Record<string, string>>({});
+
+  const payouts = useMemo(() => state.allUsers.flatMap(user => 
+    user.transactions
+      .filter(tx => tx.type === 'WITHDRAW' && tx.status === filter)
+      .map(tx => ({ ...tx, userId: user.id, userName: user.name }))
+  ).sort((a, b) => b.timestamp - a.timestamp), [state.allUsers, filter]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 bg-gray-900 p-2 rounded-2xl border border-gray-800">
+        {(['PENDING', 'COMPLETED', 'REJECTED'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {payouts.length === 0 ? (
+        <div className="text-center py-12 bg-gray-900 rounded-[40px] border border-gray-800 opacity-50">
+          <p className="text-[10px] font-black uppercase tracking-widest">No {filter.toLowerCase()} payouts</p>
+        </div>
+      ) : (
+        payouts.map(tx => (
+          <div key={tx.id} className="bg-gray-900 p-8 rounded-[48px] border border-gray-800 space-y-6 shadow-2xl">
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="text-base font-black italic text-blue-400 cursor-pointer" onClick={() => setViewingUserId(tx.userId)}>{tx.userName}</h4>
+                <p className="text-[10px] font-black text-gray-500 uppercase">{tx.method}</p>
+                <p className="text-[8px] font-bold text-gray-600 uppercase mt-1">{new Date(tx.timestamp).toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black">₹{tx.amount.toFixed(0)}</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase">{(tx.amount / COIN_TO_INR_RATE).toFixed(0)} Coins</p>
+              </div>
+            </div>
+
+            {filter === 'PENDING' && (
+              <div className="space-y-4 pt-4 border-t border-gray-800">
+                <div className="space-y-2">
+                  <input 
+                    type="text" 
+                    placeholder="Payment TxID (for Approval)" 
+                    value={paymentTxId[tx.id] || ''} 
+                    onChange={e => setPaymentTxId(prev => ({ ...prev, [tx.id]: e.target.value }))} 
+                    className="w-full bg-gray-950 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none focus:border-green-500/50" 
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Rejection Reason (Required for Reject)" 
+                    value={rejectionReason[tx.id] || ''} 
+                    onChange={e => setRejectionReason(prev => ({ ...prev, [tx.id]: e.target.value }))} 
+                    className="w-full bg-gray-950 border border-gray-800 p-3 rounded-xl text-xs text-white outline-none focus:border-red-500/50" 
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                      if (!rejectionReason[tx.id]) return alert("Rejection reason is required");
+                      adminActions.rejectWithdrawal(tx.userId, tx.id, rejectionReason[tx.id]);
+                    }} 
+                    className="flex-1 bg-red-600/10 border border-red-600 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase"
+                  >
+                    Reject
+                  </button>
+                  <button 
+                    onClick={() => adminActions.approveWithdrawal(tx.userId, tx.id, paymentTxId[tx.id])} 
+                    className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-600/20"
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {filter === 'COMPLETED' && tx.paymentTxId && (
+              <div className="pt-4 border-t border-gray-800">
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">TxID: <span className="text-green-400">{tx.paymentTxId}</span></p>
+              </div>
+            )}
+
+            {filter === 'REJECTED' && tx.rejectionReason && (
+              <div className="pt-4 border-t border-gray-800">
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Reason: <span className="text-red-400">{tx.rejectionReason}</span></p>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+};
+
 const AdminPanel: React.FC = () => {
-  const { state, adminActions, updateSettings, updateLogo } = useApp();
+  const { state, adminActions, updateSettings, updateLogo, calculateRiskScore } = useApp();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
@@ -243,9 +389,10 @@ const AdminPanel: React.FC = () => {
       totalSTK: u.reduce((a, b) => a + b.coins, 0),
       payouts: u.flatMap(us => us.transactions).filter(t => t.type === 'WITHDRAW' && t.status === 'COMPLETED').reduce((a, b) => a + b.amount, 0),
       active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length,
-      vips: u.filter(us => us.tag === UserTag.PASS).length
+      vips: u.filter(us => us.tag === UserTag.PASS).length,
+      vipRevenue: state.passRequests.filter(r => r.status === 'APPROVED').length * (state.settings.vipPrice || 49)
     };
-  }, [state.allUsers]);
+  }, [state.allUsers, state.passRequests, state.settings.vipPrice]);
 
   return (
     <div className="min-h-full bg-gray-950 text-gray-100 pb-32">
@@ -290,6 +437,8 @@ const AdminPanel: React.FC = () => {
                   <StatCard label="Nodes" value={analytics.active} sub={`${analytics.vips} VIP Members`} icon={Network} color="bg-indigo-500/10 text-indigo-500" />
                   <StatCard label="Paid Out" value={`₹${(analytics.payouts * COIN_TO_INR_RATE).toFixed(0)}`} sub="Total verified payouts" icon={Trophy} color="bg-green-500/10 text-green-500" />
                   <StatCard label="Queue" value={pendingPayouts.length} sub="Pending verification" icon={Clock} color="bg-orange-500/10 text-orange-500" />
+                  <StatCard label="VIP Rev" value={`₹${analytics.vipRevenue.toLocaleString()}`} sub="Total Pass Sales" icon={Crown} color="bg-yellow-500/10 text-yellow-500" />
+                  <StatCard label="Suspicious" value={state.allUsers.filter(u => calculateRiskScore(u) > 70).length} sub="High risk score" icon={AlertTriangle} color="bg-red-500/10 text-red-500" />
                 </div>
 
                 <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-6 space-y-4">
@@ -358,7 +507,14 @@ const AdminPanel: React.FC = () => {
                           <div className="flex items-center gap-4">
                             <img src={u.avatar} className="w-12 h-12 rounded-2xl border border-gray-800" />
                             <div>
-                              <p className="text-sm font-black italic">{u.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-black italic">{u.name}</p>
+                                {calculateRiskScore(u) > 70 && (
+                                  <span className="bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
+                                    <AlertTriangle size={8} /> Suspicious
+                                  </span>
+                                )}
+                              </div>
                               <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${u.status === UserStatus.ACTIVE ? 'text-blue-400' : 'text-red-500'}`}>{u.status}</p>
                             </div>
                           </div>
@@ -471,23 +627,7 @@ const AdminPanel: React.FC = () => {
             )}
 
             {activeTab === 'payouts' && (
-              <div className="space-y-6">
-                 {pendingPayouts.map(tx => (
-                   <div key={tx.id} className="bg-gray-900 p-8 rounded-[48px] border border-gray-800 space-y-6 shadow-2xl">
-                      <div className="flex justify-between items-start">
-                         <div>
-                            <h4 className="text-base font-black italic text-blue-400 cursor-pointer" onClick={() => setViewingUserId(tx.userId)}>{tx.userName}</h4>
-                            <p className="text-[10px] font-black text-gray-500 uppercase">{tx.method}</p>
-                         </div>
-                         <p className="text-2xl font-black">₹{tx.amount.toFixed(0)}</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <button onClick={() => adminActions.rejectWithdrawal(tx.userId, tx.id)} className="flex-1 bg-red-600/10 border border-red-600 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase">Reject</button>
-                        <button onClick={() => adminActions.approveWithdrawal(tx.userId, tx.id)} className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-600/20">Approve</button>
-                      </div>
-                   </div>
-                 ))}
-              </div>
+              <PayoutsTab setViewingUserId={setViewingUserId} />
             )}
 
             {activeTab === 'features' && (
@@ -547,6 +687,11 @@ const AdminPanel: React.FC = () => {
                            <label className="text-[9px] font-black text-gray-600 uppercase">Max Daily Ads</label>
                            <input type="number" value={state.settings.maxDailyAds ?? 0} onChange={e => updateSettings({ maxDailyAds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
+                     </div>
+                     <div className="space-y-2 pt-4 border-t border-gray-800">
+                        <label className="text-[9px] font-black text-red-500 uppercase flex items-center gap-2"><AlertTriangle size={12} /> Emergency Reward Reduction (%)</label>
+                        <input type="number" min="0" max="100" value={state.settings.emergencyRewardReduction ?? 0} onChange={e => updateSettings({ emergencyRewardReduction: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-red-900/50 p-4 rounded-2xl text-center text-red-500 font-black focus:border-red-500 outline-none" placeholder="e.g. 50 for half rewards" />
+                        <p className="text-[8px] text-gray-500 uppercase font-bold text-center">Instantly reduces all mining and spin rewards by this percentage.</p>
                      </div>
                   </div>
                </div>
@@ -646,9 +791,25 @@ const AdminPanel: React.FC = () => {
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Finance & Logo</h3>
                      </div>
                      <div className="space-y-4">
-                        <div className="space-y-2">
-                           <label className="text-[9px] font-black text-gray-600 uppercase">Min Withdrawal</label>
-                           <input type="number" value={state.settings.minWithdrawalCoins} onChange={e => updateSettings({ minWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-gray-600 uppercase">Min Withdrawal</label>
+                             <input type="number" value={state.settings.minWithdrawalCoins} onChange={e => updateSettings({ minWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-gray-600 uppercase">Daily Withdraw Limit</label>
+                             <input type="number" value={state.settings.dailyWithdrawalLimit || 5000} onChange={e => updateSettings({ dailyWithdrawalLimit: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-gray-600 uppercase">VIP Price (INR)</label>
+                             <input type="number" value={state.settings.vipPrice || 49} onChange={e => updateSettings({ vipPrice: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-gray-600 uppercase">VIP Duration (Days)</label>
+                             <input type="number" value={state.settings.vipDurationDays || 30} onChange={e => updateSettings({ vipDurationDays: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                          </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-gray-800">
                            <label className="text-[9px] font-black text-gray-600 uppercase px-1">Admin UPI ID</label>

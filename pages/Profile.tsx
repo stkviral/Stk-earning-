@@ -41,7 +41,7 @@ const Profile: React.FC = () => {
   const menuItems = [
     { id: 'wallet', icon: Wallet, label: 'My Wallet', desc: 'Manage your earnings', color: 'text-blue-500' },
     { id: 'invite', icon: Share2, label: 'Refer & Earn', desc: 'Invite friends for rewards', color: 'text-green-500' },
-    { id: 'faq', icon: HelpCircle, label: 'Support Center', desc: 'Get help and tutorials', color: 'text-orange-500' },
+    { id: 'discord', icon: HelpCircle, label: 'Support Center', desc: 'Join our Discord server', color: 'text-orange-500' },
   ];
 
   const handleLogout = () => {
@@ -176,7 +176,14 @@ const Profile: React.FC = () => {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => { playSound('tap'); setActiveTab(item.id); }}
+            onClick={() => { 
+              playSound('tap'); 
+              if (item.id === 'discord') {
+                window.open('https://discord.gg/FrUwmRdunZ', '_blank');
+              } else {
+                setActiveTab(item.id); 
+              }
+            }}
             className="w-full bg-white dark:bg-gray-900 p-5 rounded-[28px] border border-gray-100 dark:border-gray-800 flex items-center justify-between group hover:border-blue-500/30 transition-all shadow-sm"
           >
             <div className="flex items-center gap-4">
@@ -215,7 +222,7 @@ const Profile: React.FC = () => {
         <div className="flex items-center justify-center gap-4">
           <button onClick={() => setActiveTab('privacy')} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Privacy</button>
           <div className="w-1 h-1 bg-gray-300 rounded-full" />
-          <button onClick={() => setActiveTab('faq')} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Support</button>
+          <a href="https://discord.gg/FrUwmRdunZ" target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Support</a>
           <div className="w-1 h-1 bg-gray-300 rounded-full" />
           <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">v2.4.0</span>
         </div>

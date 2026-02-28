@@ -42,11 +42,12 @@ interface AppContextType {
   logAdminAction: (action: string, targetId: string, details: string) => void;
   logActivity: (userId: string, userName: string, action: string, details: string) => void;
   adminActions: {
-    approveWithdrawal: (userId: string, txId: string) => void;
-    rejectWithdrawal: (userId: string, txId: string) => void;
+    approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => void;
+    rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => void;
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => void;
     setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => void;
-    modifyCoins: (userId: string, amount: number) => void;
+    modifyCoins: (userId: string, amount: number, reason: string) => void;
+    resetCooldowns: (userId: string, type: 'MINING' | 'SPIN' | 'ALL', reason: string) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
     approvePassRequest: (requestId: string) => void;
@@ -89,7 +90,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   withdrawalCooldownHours: 24,
   paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=49&cu=INR",
   adminUpiId: "stk@upi",
-  maxDailyAds: 20
+  maxDailyAds: 20,
+  dailyWithdrawalLimit: 5000,
+  vipPrice: 49,
+  vipDurationDays: 30,
+  spinProbabilities: { "1": 40, "2": 30, "3": 15, "4": 8, "5": 5, "10": 2 },
+  emergencyRewardReduction: 0
 };
 
 const App: React.FC = () => {
@@ -105,8 +111,9 @@ const App: React.FC = () => {
       logs: parsed?.logs || [],
       activityLogs: parsed?.activityLogs || [],
       passRequests: parsed?.passRequests || [],
+      adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       isAdBlockerActive: false,
-      isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL,
+      isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === parsed?.currentUser?.email),
       theme: parsed?.theme || 'dark'
     };
   });
@@ -400,25 +407,25 @@ const App: React.FC = () => {
   };
 
   const adminActions = {
-    approveWithdrawal: (userId: string, txId: string) => {
+    approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => {
       setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const } : t) });
+        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
-      logAdminAction('PAYOUT_APPROVE', userId, `Approved payout ${txId}`);
+      logAdminAction('PAYOUT_APPROVE', userId, `Approved payout ${txId}${paymentTxId ? ` (TxID: ${paymentTxId})` : ''}`);
     },
-    rejectWithdrawal: (userId: string, txId: string) => {
+    rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
           const tx = u.transactions.find(t => t.id === txId);
-          return { ...u, coins: u.coins + (tx?.amount || 0), transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'REJECTED' as const } : t) };
+          return { ...u, coins: u.coins + (tx?.amount || 0), transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
-      logAdminAction('PAYOUT_REJECT', userId, `Rejected payout ${txId}`);
+      logAdminAction('PAYOUT_REJECT', userId, `Rejected payout ${txId}. Reason: ${rejectionReason}`);
     },
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => {
       setState(prev => {
@@ -436,13 +443,44 @@ const App: React.FC = () => {
       });
       logAdminAction('STATUS_OVERRIDE', userId, `Status set to ${status}`);
     },
-    modifyCoins: (userId: string, amount: number) => {
+    modifyCoins: (userId: string, amount: number, reason: string) => {
       setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, coins: Math.max(0, u.coins + amount) });
+        const newAllUsers = prev.allUsers.map(u => {
+          if (u.id !== userId) return u;
+          const tx: Transaction = {
+            id: 'ADJ-' + Math.random().toString(36).substring(2, 9),
+            amount,
+            type: 'ADJUST',
+            method: reason,
+            status: 'COMPLETED',
+            timestamp: Date.now()
+          };
+          return { ...u, coins: Math.max(0, u.coins + amount), transactions: [tx, ...u.transactions] };
+        });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
-      logAdminAction('COIN_ADJUST', userId, `Adjusted by ${amount}`);
+      logAdminAction('COIN_ADJUST', userId, `Adjusted ${amount} coins. Reason: ${reason}`);
+    },
+    resetCooldowns: (userId: string, type: 'MINING' | 'SPIN' | 'ALL', reason: string) => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => {
+          if (u.id !== userId) return u;
+          const updates: Partial<User> = {};
+          if (type === 'MINING' || type === 'ALL') {
+             updates.miningStartedAt = undefined;
+             updates.miningClaimed = false;
+          }
+          if (type === 'SPIN' || type === 'ALL') {
+             updates.spinsToday = 0;
+             updates.lastSpinTimestamp = 0;
+          }
+          return { ...u, ...updates };
+        });
+        const updated = newAllUsers.find(u => u.id === userId);
+        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+      });
+      logAdminAction('RESET_COOLDOWN', userId, `Reset ${type} cooldown. Reason: ${reason}`);
     },
     updateUserSettings: (userId: string, updates: Partial<User>) => {
       setState(prev => {
@@ -539,10 +577,31 @@ const App: React.FC = () => {
     }
   };
 
+  const calculateRiskScore = useCallback((user: User) => {
+    let score = 0;
+    
+    // Check for shared Device ID
+    const sharedDevice = state.allUsers.filter(u => u.deviceId === user.deviceId && u.id !== user.id).length;
+    if (sharedDevice > 0) score += sharedDevice * 20;
+
+    // Check for shared IP
+    const sharedIp = state.allUsers.filter(u => u.lastIp === user.lastIp && u.id !== user.id).length;
+    if (sharedIp > 0) score += sharedIp * 10;
+
+    // Check earning velocity (if they earned more than daily cap)
+    if (user.dailyEarned > state.settings.dailyCapNormal * 2) score += 30;
+
+    // Check referral abuse (if many referrals have same IP)
+    const suspiciousReferrals = state.allUsers.filter(u => u.referredBy === user.referralCode && u.lastIp === user.lastIp).length;
+    if (suspiciousReferrals > 0) score += suspiciousReferrals * 25;
+
+    return Math.min(100, score);
+  }, [state.allUsers, state.settings.dailyCapNormal]);
+
   return (
     <AppContext.Provider value={{
       state, updateUser, updateLogo, updateSettings, addCoins, playAd, login, logout, 
-      toggleTheme, buyPass, submitPassRequest, withdraw, setActiveTab, calculateRiskScore: () => 0,
+      toggleTheme, buyPass, submitPassRequest, withdraw, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, adminActions
     }}>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-white dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">

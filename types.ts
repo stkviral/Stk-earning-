@@ -11,6 +11,17 @@ export enum UserStatus {
   SUSPENDED = 'SUSPENDED'
 }
 
+export enum AdminRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  SUB_ADMIN = 'SUB_ADMIN'
+}
+
+export interface AdminUser {
+  email: string;
+  role: AdminRole;
+  requires2FA: boolean;
+}
+
 export interface Transaction {
   id: string;
   amount: number;
@@ -18,6 +29,8 @@ export interface Transaction {
   method: string;
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
   timestamp: number;
+  rejectionReason?: string;
+  paymentTxId?: string;
 }
 
 export interface PassRequest {
@@ -116,6 +129,11 @@ export interface AppSettings {
   paymentQrUrl: string;
   adminUpiId: string;
   maxDailyAds: number;
+  dailyWithdrawalLimit: number;
+  vipPrice: number;
+  vipDurationDays: number;
+  spinProbabilities: Record<string, number>;
+  emergencyRewardReduction: number;
 }
 
 export interface AppState {
@@ -127,6 +145,7 @@ export interface AppState {
   logs: AdminLog[];
   activityLogs: ActivityLog[];
   passRequests: PassRequest[];
+  adminUsers: AdminUser[];
 }
 
 export const COIN_TO_INR_RATE = 10 / 100;

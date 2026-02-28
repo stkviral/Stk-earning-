@@ -114,7 +114,9 @@ const FAQ: React.FC = () => {
             Our support team is here to help you with any issues or withdrawal questions.
           </p>
           <a 
-            href="mailto:support@stkearning.com" 
+            href="https://discord.gg/FrUwmRdunZ" 
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex bg-white text-blue-600 px-8 py-4 rounded-[24px] font-black text-[11px] uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all hover:brightness-110"
           >
             Contact Support
