@@ -68,20 +68,25 @@ const Dashboard: React.FC = () => {
 
   if (!currentUser) return null;
 
-  const isPassUser = currentUser.tag === UserTag.PASS;
   const dailyCap = settings.dailyCapNormal;
-  const progressPercent = isPassUser ? 100 : Math.min(100, ((currentUser.dailyEarned || 0) / dailyCap) * 100);
+  const progressPercent = Math.min(100, ((currentUser.dailyEarned || 0) / dailyCap) * 100);
 
   // Mining Status
-  const isMiningActive = currentUser.miningStartedAt && Date.now() < (currentUser.miningStartedAt + (isPassUser ? settings.miningDurationVIP : settings.miningDurationNormal));
+  const isMiningActive = currentUser.miningStartedAt && Date.now() < (currentUser.miningStartedAt + settings.miningDurationNormal);
 
   const handleClaimDailyBonus = () => {
     if (currentUser.dailyRewardClaimed) return;
     playAd(() => {
-      const success = addCoins(settings.dailyBonusReward, 'Daily Bonus');
+      const streakBonus = currentUser.streakDays || 0;
+      const totalReward = settings.dailyBonusReward + streakBonus;
+      const success = addCoins(totalReward, 'Daily Bonus');
       if (success) {
-        updateUser({ dailyRewardClaimed: true, lastResetTimestamp: Date.now() });
-        logActivity(currentUser.id, currentUser.name, 'DAILY_BONUS', `Claimed ${settings.dailyBonusReward} coins`);
+        updateUser({ 
+          dailyRewardClaimed: true, 
+          lastResetTimestamp: Date.now(),
+          streakDays: streakBonus + 1
+        });
+        logActivity(currentUser.id, currentUser.name, 'DAILY_BONUS', `Claimed ${totalReward} coins (Streak: ${streakBonus + 1})`);
       }
     }, 'REQUIRED');
   };
@@ -118,8 +123,7 @@ const Dashboard: React.FC = () => {
         <div className="relative group overflow-hidden rounded-[40px] shadow-2xl transition-all duration-700 border border-white/20 dark:border-white/5 bg-white dark:bg-gray-900">
            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 opacity-10 dark:opacity-20" />
            <div className="absolute top-[-50%] right-[-50%] w-[100%] h-[200%] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_50%)] animate-spin-slow pointer-events-none" />
-           
-           <div className="relative z-10 p-8 space-y-8">
+                      <div className="relative z-10 p-8 space-y-8">
               <div className="flex flex-col items-center text-center space-y-2">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800/50">
                   <Wallet size={12} className="text-blue-600 dark:text-blue-400" />
@@ -127,28 +131,27 @@ const Dashboard: React.FC = () => {
                 </div>
                 
                 <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-2xl font-black text-gray-400 dark:text-gray-500 italic">₹</span>
                   <span className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter italic tabular-nums leading-none drop-shadow-sm">
-                    {(currentUser.coins * COIN_TO_INR_RATE).toFixed(0)}<span className="text-2xl opacity-40">.{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2).split('.')[1]}</span>
+                    {currentUser.coins.toLocaleString()}
                   </span>
+                  <span className="text-2xl font-black text-gray-400 dark:text-gray-500 italic">STK</span>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-[24px] border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 shadow-inner">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                    <Coins size={20} className="text-yellow-600 dark:text-yellow-500" />
+                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <span className="text-green-600 dark:text-green-500 font-black">₹</span>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-black text-gray-900 dark:text-white tabular-nums leading-none">{currentUser.coins.toLocaleString()}</p>
-                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">STK Coins</p>
+                    <p className="text-lg font-black text-gray-900 dark:text-white tabular-nums leading-none">{(currentUser.coins * COIN_TO_INR_RATE).toFixed(2)}</p>
+                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Cash Value</p>
                   </div>
                 </div>
                 
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-[24px] border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 shadow-inner relative overflow-hidden">
-                  {isPassUser && <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/10 to-orange-500/10" />}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isPassUser ? 'bg-yellow-400 text-white shadow-lg shadow-yellow-500/30' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500'}`}>
-                    {isPassUser ? <Crown size={20} /> : <TrendingUp size={20} />}
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500">
+                    <TrendingUp size={20} />
                   </div>
                   <div className="text-center relative z-10">
                     <p className="text-lg font-black text-gray-900 dark:text-white tabular-nums leading-none">+{currentUser.dailyEarned.toLocaleString()}</p>
@@ -164,12 +167,12 @@ const Dashboard: React.FC = () => {
                        <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Daily Capacity</span>
                     </div>
                     <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase italic tracking-tighter">
-                       {isPassUser ? 'UNLIMITED' : `${Math.floor(progressPercent)}% USED`}
+                       {`${Math.floor(progressPercent)}% USED`}
                     </span>
                  </div>
                  <div className="h-3 bg-blue-100 dark:bg-gray-900 rounded-full overflow-hidden p-0.5 border border-blue-200 dark:border-gray-800 shadow-inner">
                     <div 
-                      className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${isPassUser ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'}`} 
+                      className="h-full rounded-full transition-all duration-1000 relative overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-500" 
                       style={{ width: `${Math.min(100, progressPercent)}%` }} 
                     >
                        <div className="absolute inset-0 animate-shimmer-wave bg-gradient-to-r from-transparent via-white/40 to-transparent" />
@@ -224,7 +227,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="px-5 py-2 bg-white/50 dark:bg-gray-800/50 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/50 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-             <ZapIcon size={12} fill="currentColor" /> {isPassUser ? '∞ TURNS' : `${settings.maxDailySpinsNormal - currentUser.spinsToday} LEFT`}
+             <ZapIcon size={12} fill="currentColor" /> {`${settings.maxDailySpinsNormal - currentUser.spinsToday} LEFT`}
           </div>
         </div>
       </div>
@@ -251,7 +254,7 @@ const Dashboard: React.FC = () => {
               <div className="space-y-1">
                 <h4 className={`text-xl font-black uppercase italic tracking-tighter ${currentUser.dailyRewardClaimed ? 'text-gray-500 dark:text-gray-400' : 'text-green-900 dark:text-green-100'}`}>Daily Reward</h4>
                 <p className={`text-[10px] font-black uppercase tracking-widest ${currentUser.dailyRewardClaimed ? 'text-gray-400 dark:text-gray-500' : 'text-green-600/80 dark:text-green-400/80'}`}>
-                  {currentUser.dailyRewardClaimed ? `Next in: ${timeLeft}` : `Claim +${settings.dailyBonusReward} STK`}
+                  {currentUser.dailyRewardClaimed ? `Next in: ${timeLeft}` : `Claim +${settings.dailyBonusReward + (currentUser.streakDays || 0)} STK (Streak: ${currentUser.streakDays || 0})`}
                 </p>
               </div>
            </div>
@@ -282,48 +285,53 @@ const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* 5. VIP Monthly Pass - Call to Ascension */}
-      {!isPassUser && (
-        <div 
-          onClick={() => { playSound('tap'); setActiveTab('pass'); }} 
-          className="bg-gray-950 dark:bg-black rounded-[56px] p-10 shadow-4xl relative overflow-hidden group border border-white/10 active:scale-95 transition-all z-10"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_70%)]" />
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-1000 pointer-events-none">
-             <Crown size={180} />
+      {/* 5. Daily Boost - Ad-based temporary 2x */}
+      <div 
+        onClick={() => {
+          playSound('tap');
+          playAd(() => {
+            updateUser({
+              is2xMiningUnlocked: true,
+              adsFor2xMining: 10 // Or whatever logic you want, maybe just a simple boost
+            });
+            alert("Daily Boost Activated! Enjoy faster earnings.");
+          }, 'REWARD');
+        }} 
+        className="bg-gray-950 dark:bg-black rounded-[56px] p-10 shadow-4xl relative overflow-hidden group border border-white/10 active:scale-95 transition-all z-10"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_70%)]" />
+        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-1000 pointer-events-none">
+           <Zap size={180} />
+        </div>
+        
+        <div className="relative z-10 space-y-8">
+          <div className="flex items-center gap-6">
+            <div className="w-18 h-18 bg-gradient-to-br from-yellow-400 to-orange-600 text-blue-950 rounded-[28px] flex items-center justify-center shadow-3xl animate-float p-4">
+               <Zap size={32} fill="currentColor" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-yellow-500 font-black uppercase tracking-[0.5em] italic">Daily Boost</p>
+              <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">2X EARNINGS</h3>
+            </div>
           </div>
           
-          <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-6">
-              <div className="w-18 h-18 bg-gradient-to-br from-yellow-400 to-orange-600 text-blue-950 rounded-[28px] flex items-center justify-center shadow-3xl animate-float p-4">
-                 <Crown size={32} fill="currentColor" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-yellow-500 font-black uppercase tracking-[0.5em] italic">VIP Upgrade</p>
-                <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">VIP ELITE</h3>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-y-4 gap-x-6 bg-white/5 p-6 rounded-[36px] border border-white/5 backdrop-blur-md">
-               {[
-                 { text: "Unlimited Earnings", icon: <TrendingUp size={12} /> },
-                 { text: "Zero Withdrawal Fees", icon: <Zap size={12} /> },
-                 { text: "2X Faster Mining", icon: <Cpu size={12} /> },
-                 { text: "Custom Theme Access", icon: <Layers size={12} /> }
-               ].map((item, i) => (
-                 <div key={i} className="flex items-center gap-3">
-                    <div className="text-yellow-500">{item.icon}</div>
-                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{item.text}</span>
-                 </div>
-               ))}
-            </div>
-            
-            <button className="w-full bg-white text-gray-950 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-2xl flex items-center justify-center gap-4 transition-all border-b-[6px] border-gray-200 active:border-b-0 active:translate-y-1">
-               ACTIVATE SUPREME ACCESS <ChevronRight size={18} />
-            </button>
+          <div className="grid grid-cols-2 gap-y-4 gap-x-6 bg-white/5 p-6 rounded-[36px] border border-white/5 backdrop-blur-md">
+             {[
+               { text: "Double Mining Speed", icon: <Cpu size={12} /> },
+               { text: "Watch Ad to Activate", icon: <PlayCircle size={12} /> }
+             ].map((item, i) => (
+               <div key={i} className="flex items-center gap-3">
+                  <div className="text-yellow-500">{item.icon}</div>
+                  <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{item.text}</span>
+               </div>
+             ))}
           </div>
+          
+          <button className="w-full bg-white text-gray-950 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-2xl flex items-center justify-center gap-4 transition-all border-b-[6px] border-gray-200 active:border-b-0 active:translate-y-1">
+             ACTIVATE BOOST <ChevronRight size={18} />
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Global Broadcast Notification */}
       {showNotification && settings.systemNotification && (

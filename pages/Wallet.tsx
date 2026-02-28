@@ -138,7 +138,7 @@ const TransactionItem: React.FC<{ tx: Transaction }> = ({ tx }) => {
                    <div className="space-y-2">
                      <div className="flex justify-between items-center">
                         <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Payout Timeline</span>
-                        <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest italic">Est. 24h</span>
+                        <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest italic">Est. 48h</span>
                      </div>
                      <div className="flex items-center gap-2">
                         {progressSteps.map((step, i) => (
@@ -236,13 +236,12 @@ const Wallet: React.FC = () => {
   if (!currentUser) return null;
 
   const currentBalanceINR = currentUser.coins * COIN_TO_INR_RATE;
-  const isPass = currentUser.tag === UserTag.PASS;
-  const feePercent = isPass ? 0 : settings.withdrawalFeeNormal;
+  const feePercent = settings.withdrawalFeeNormal || 2;
   
   const numAmount = typeof withdrawAmount === 'string' ? parseInt(withdrawAmount) || 0 : withdrawAmount;
   const grossINR = numAmount * COIN_TO_INR_RATE;
   const feeINR = grossINR * (feePercent / 100);
-  const netINR = grossINR - feeINR;
+  const netINR = isNaN(grossINR - feeINR) ? 0 : (grossINR - feeINR);
 
   const minThreshold = settings.minWithdrawalCoins || MIN_WITHDRAWAL_COINS;
   const progressToMin = Math.min(100, (currentUser.coins / minThreshold) * 100);
@@ -326,22 +325,15 @@ const Wallet: React.FC = () => {
                 <p className="text-[9px] font-black text-blue-300 uppercase tracking-[0.5em] opacity-60">Total Balance</p>
                 <div className="flex flex-col">
                   <motion.div animate={balanceControls} className="flex items-baseline gap-3">
-                    <span className="text-sm font-black text-blue-400 italic">₹</span>
-                    <span className="text-5xl font-black tracking-tighter italic tabular-nums leading-none">
-                      {currentBalanceINR.toFixed(0)}<span className="text-2xl opacity-30">.{currentBalanceINR.toFixed(2).split('.')[1]}</span>
+                    <span className="text-5xl font-black tracking-tighter italic tabular-nums leading-none text-white">
+                      {currentUser.coins.toLocaleString()}
                     </span>
+                    <span className="text-sm font-black text-blue-400 italic">STK</span>
                   </motion.div>
                   <div className="flex items-center gap-3 mt-6">
                     <motion.div animate={balanceControls} className="bg-white/5 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/10 flex items-center gap-2.5 shadow-inner">
-                      <Coins size={14} className="text-yellow-400" />
-                      <span className="text-[11px] font-black uppercase tracking-tighter tabular-nums">{currentUser.coins.toLocaleString()} COINS</span>
+                      <span className="text-[11px] font-black uppercase tracking-tighter tabular-nums text-green-400">₹{currentBalanceINR.toFixed(2)}</span>
                     </motion.div>
-                    {isPass && (
-                      <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-blue-950 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-xl shadow-yellow-500/20 animate-in zoom-in-50 duration-500">
-                         <Crown size={12} fill="currentColor" />
-                         <span className="text-[9px] font-black uppercase italic">Elite Tier</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -396,7 +388,7 @@ const Wallet: React.FC = () => {
           </div>
           <div className="hidden sm:flex flex-col items-end gap-1">
              <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Estimated Time</span>
-             <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">2 - 24 Hours</span>
+             <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">24 - 48 Hours</span>
           </div>
         </div>
 
@@ -414,7 +406,7 @@ const Wallet: React.FC = () => {
               {[
                 { label: 'Request', time: 'Instant', icon: <Zap size={10} /> },
                 { label: 'Audit', time: '1-2h', icon: <ShieldCheck size={10} /> },
-                { label: 'Payout', time: '2-24h', icon: <ArrowUpRight size={10} /> }
+                { label: 'Payout', time: '24-48h', icon: <ArrowUpRight size={10} /> }
               ].map((step, i) => (
                 <div key={i} className="flex-1 space-y-2">
                    <div className="flex items-center gap-2">
@@ -521,8 +513,8 @@ const Wallet: React.FC = () => {
              </div>
              <div className="text-right relative z-10 bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Platform Fee</p>
-                <p className={`text-[11px] font-black uppercase tracking-tighter ${isPass ? 'text-green-500' : 'text-red-500'}`}>
-                  {isPass ? 'FREE' : `-₹${feeINR.toFixed(1)}`}
+                <p className="text-[11px] font-black uppercase tracking-tighter text-red-500">
+                  -₹{feeINR.toFixed(1)}
                 </p>
              </div>
           </div>
@@ -603,7 +595,13 @@ const Wallet: React.FC = () => {
                 <p className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-400">Zero Node Activity</p>
               </motion.div>
             ) : (
-              <>
+              <motion.div 
+                key="list"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-4"
+              >
                 {paginatedTransactions.map((tx, index) => (
                   <TransactionItem key={tx.id} tx={tx} />
                 ))}
@@ -629,7 +627,7 @@ const Wallet: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </>
+              </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
@@ -670,10 +668,9 @@ const Wallet: React.FC = () => {
                 <div className="flex justify-between items-center px-1">
                    <div className="flex items-center gap-2">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Platform Fee</p>
-                      {isPass && <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-[8px] font-black px-2 py-0.5 rounded-lg border border-green-200 dark:border-green-800 uppercase">WAIVED</span>}
                    </div>
-                   <p className={`text-lg font-black ${isPass ? 'text-green-500' : 'text-red-500'} tracking-tight tabular-nums`}>
-                     {isPass ? '₹0.00' : `-₹${feeINR.toFixed(2)}`}
+                   <p className="text-lg font-black text-red-500 tracking-tight tabular-nums">
+                     -₹{feeINR.toFixed(2)}
                    </p>
                 </div>
               </div>
@@ -686,7 +683,7 @@ const Wallet: React.FC = () => {
                 <div className="flex items-baseline gap-2">
                   <span className="text-sm font-black text-blue-500 italic">₹</span>
                   <span className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter italic tabular-nums leading-none">
-                    {netINR.toFixed(0)}<span className="text-2xl opacity-30">.{netINR.toFixed(2).split('.')[1]}</span>
+                    {netINR.toFixed(2).split('.')[0]}<span className="text-2xl opacity-30">.{netINR.toFixed(2).split('.')[1]}</span>
                   </span>
                 </div>
               </div>

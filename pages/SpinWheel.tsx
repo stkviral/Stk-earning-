@@ -51,8 +51,8 @@ const SpinWheel: React.FC = () => {
     );
   }
 
-  const isUnlimited = currentUser.tag === UserTag.PASS;
-  const remainingSpins = settings.maxDailySpinsNormal - currentUser.spinsToday;
+  const maxSpins = settings.maxDailySpinsNormal;
+  const remainingSpins = maxSpins - currentUser.spinsToday;
 
   const handleSpin = async () => {
     if (isAdBlockerActive) {
@@ -60,14 +60,14 @@ const SpinWheel: React.FC = () => {
       return;
     }
 
-    if (!isUnlimited && remainingSpins <= 0) {
+    if (remainingSpins <= 0) {
       alert("No spins left! Watch an ad to unlock one extra turn or wait for tomorrow.");
       return;
     }
 
     if (spinning || isWobbling || isAdPending) return;
 
-    if (cooldownTime > 0 && !isUnlimited) {
+    if (cooldownTime > 0) {
       alert(`Spin Cooldown: Please wait ${cooldownTime}s.`);
       return;
     }
@@ -82,7 +82,25 @@ const SpinWheel: React.FC = () => {
       setSpinning(true);
       playSound('ignite');
       
-      const segmentIndex = Math.floor(Math.random() * settings.spinRewards.length);
+      // Use probability weights to select reward
+      let totalWeight = 0;
+      const weights = settings.spinRewards.map(reward => {
+        const weight = settings.spinProbabilities[reward.toString()] || 1;
+        totalWeight += weight;
+        return weight;
+      });
+      
+      let randomNum = Math.random() * totalWeight;
+      let selectedRewardIndex = 0;
+      for (let i = 0; i < weights.length; i++) {
+        randomNum -= weights[i];
+        if (randomNum <= 0) {
+          selectedRewardIndex = i;
+          break;
+        }
+      }
+
+      const segmentIndex = selectedRewardIndex;
       const segmentAngle = 360 / settings.spinRewards.length;
       const extraRotations = 10 * 360; 
       const currentAngleOffset = rotation % 360;
@@ -214,19 +232,19 @@ const SpinWheel: React.FC = () => {
             </div>
             <div>
               <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest italic">Turn Supply</p>
-              <p className="text-xs font-black text-gray-900 dark:text-white uppercase italic">{isUnlimited ? 'Elite Status' : 'Standard Yield'}</p>
+              <p className="text-xs font-black text-gray-900 dark:text-white uppercase italic">Standard Yield</p>
             </div>
           </div>
-          <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black shadow-md transition-all ${isUnlimited ? 'bg-yellow-400 text-blue-950 scale-105' : 'bg-blue-600 text-white'}`}>
-             {isUnlimited ? 'VIP' : `${remainingSpins} LEFT`}
+          <div className="px-3 py-1.5 rounded-xl text-[9px] font-black shadow-md transition-all bg-blue-600 text-white">
+             {remainingSpins} LEFT
           </div>
         </div>
 
         <div className="space-y-2">
           <button 
             onClick={handleSpin}
-            disabled={spinning || isWobbling || (!isUnlimited && remainingSpins <= 0) || isAdBlockerActive || isAdPending}
-            className={`w-full py-5 rounded-3xl font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3 relative overflow-hidden group border-b-8 active:scale-95 ${isAdBlockerActive || isAdPending || (!isUnlimited && remainingSpins <= 0) ? 'bg-gray-200 border-gray-400 opacity-40 grayscale text-gray-400' : 'bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-900 text-white border-blue-900 shadow-blue-500/30'}`}
+            disabled={spinning || isWobbling || remainingSpins <= 0 || isAdBlockerActive || isAdPending}
+            className={`w-full py-5 rounded-3xl font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3 relative overflow-hidden group border-b-8 active:scale-95 ${isAdBlockerActive || isAdPending || remainingSpins <= 0 ? 'bg-gray-200 border-gray-400 opacity-40 grayscale text-gray-400' : 'bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-700 dark:to-indigo-900 text-white border-blue-900 shadow-blue-500/30'}`}
           >
             {spinning || isAdPending ? <Loader2 className="animate-spin" size={24} /> : (
               <>
@@ -236,7 +254,7 @@ const SpinWheel: React.FC = () => {
             )}
           </button>
 
-          {!isUnlimited && remainingSpins <= 0 && !currentUser.extraSpinWatchedToday && (
+          {remainingSpins <= 0 && !currentUser.extraSpinWatchedToday && (
              <button 
                onClick={handleUnlockExtraSpin}
                disabled={isAdPending || isAdBlockerActive}

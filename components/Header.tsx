@@ -44,19 +44,6 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
 
   const currentBalanceINR = displayedCoins * COIN_TO_INR_RATE;
 
-  const getDaysLeft = () => {
-    if (currentUser?.tag === UserTag.PASS && currentUser.passPurchaseTimestamp) {
-      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-      const expiryTime = currentUser.passPurchaseTimestamp + thirtyDays;
-      const diff = expiryTime - Date.now();
-      return Math.ceil(diff / (1000 * 60 * 60 * 24));
-    }
-    return null;
-  };
-
-  const daysLeft = getDaysLeft();
-  const isVIP = currentUser?.tag === UserTag.PASS;
-
   return (
     <header className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white p-3 shadow-xl z-[100] relative overflow-hidden transition-all duration-700 border-b border-gray-100 dark:border-white/10">
       <div className="absolute top-0 right-0 w-48 h-48 bg-blue-600/10 rounded-full blur-[60px] -mr-24 -mt-24 pointer-events-none" />
@@ -84,12 +71,6 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
               <h1 className="font-black text-[11px] tracking-tight truncate max-w-[80px] uppercase italic">
                 {isAdmin ? 'System Root' : currentUser?.name.split(' ')[0]}
               </h1>
-              {!isAdmin && isVIP && (
-                <div className="flex items-center gap-1.5 bg-yellow-400 px-2 py-0.5 rounded-lg text-blue-900 shadow-xl shadow-yellow-400/20 animate-pulse">
-                   <Crown size={10} fill="currentColor" />
-                   <span className="text-[8px] font-black uppercase">VIP</span>
-                </div>
-              )}
             </div>
             
             {!isAdmin && (
@@ -112,15 +93,6 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         </div>
 
         <div className="flex items-center gap-1">
-          {!isAdmin && currentUser?.tag === UserTag.PASS && daysLeft !== null && (
-            <div className="mr-1 bg-blue-600/20 px-3 py-1.5 rounded-xl flex items-center gap-2 border border-gray-200 dark:border-white/10 shadow-inner">
-               <Clock size={12} className="text-yellow-400 animate-pulse" />
-               <span className="text-[9px] font-black text-gray-900 dark:text-white uppercase tracking-widest">
-                 {daysLeft}D
-               </span>
-            </div>
-          )}
-
           <div className="flex items-center bg-gray-50 dark:bg-white/5 p-1 rounded-2xl border border-gray-100 dark:border-white/5">
             {currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (
               <button 
@@ -130,20 +102,12 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 <ShieldCheck size={22} />
               </button>
             )}
-            {!isAdmin && isVIP && (
+            {!isAdmin && (
               <button 
                 onClick={() => { playSound('tap'); toggleTheme(); }}
                 className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-blue-600 dark:text-yellow-400"
               >
                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-            )}
-            {!isAdmin && !isVIP && (
-              <button 
-                onClick={() => { playSound('tap'); setActiveTab('pass'); }}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90 text-yellow-500 animate-pulse"
-              >
-                <Crown size={22} fill="currentColor" />
               </button>
             )}
           </div>

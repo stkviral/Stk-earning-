@@ -98,11 +98,14 @@ const Mining: React.FC = () => {
     );
   }
 
-  const isPass = currentUser.tag === UserTag.PASS;
-  const isBoosted = !isPass && currentUser.is2xMiningUnlocked;
-  const finalReward = isPass ? settings.miningRewardVIP : (isBoosted ? settings.miningRewardNormal * 2 : settings.miningRewardNormal);
+  const isBoosted = currentUser.is2xMiningUnlocked;
+  const finalReward = isBoosted ? settings.miningRewardNormal * 2 : settings.miningRewardNormal;
   
-  const effectiveDuration = isPass ? settings.miningDurationVIP : settings.miningDurationNormal;
+  const effectiveDuration = settings.miningDurationNormal;
+  const maxCycles = settings.miningCyclesPerDayNormal;
+  const cyclesToday = currentUser.miningCyclesToday || 0;
+  const hasReachedDailyLimit = cyclesToday >= maxCycles;
+
   const miningStartedAt = currentUser.miningStartedAt || 0;
   const lastClaimedAt = currentUser.miningLastClaimedAt || 0;
   const miningEndedAt = miningStartedAt + effectiveDuration;
@@ -113,57 +116,26 @@ const Mining: React.FC = () => {
   const isCooldownActive = currentTime < cooldownEndedAt && !isMiningActive && !isMiningComplete;
 
   const progressPercent = isMiningActive ? Math.min(100, ((currentTime - miningStartedAt) / effectiveDuration) * 100) : (isMiningComplete ? 100 : 0);
-  const isVisualPremium = isPass || isBoosted;
+  const isVisualPremium = isBoosted;
 
   const handleStartMining = () => {
-    if (isMiningActive || isMiningComplete || isCooldownActive || isProcessing) return;
+    if (isMiningActive || isMiningComplete || isCooldownActive || isProcessing || hasReachedDailyLimit) return;
     if (isAdBlockerActive) return alert("Ad-Blocker Detected: Please disable it to start mining.");
     
-    if (isPass) {
-        playSound('ignite');
-        updateUser({ miningStartedAt: Date.now(), miningClaimed: false });
-        logActivity(currentUser.id, currentUser.name, 'MINING_START', 'Started mining reactor (VIP)');
-        return;
-    }
-
-    setIsProcessing(true);
-    playAd(() => {
-      const nextCount = adsWatchedToStart + 1;
-      setAdsWatchedToStart(nextCount);
-      if (nextCount >= 3) {
-        playSound('ignite');
-        updateUser({ miningStartedAt: Date.now(), miningClaimed: false });
-        logActivity(currentUser.id, currentUser.name, 'MINING_START', 'Started mining reactor');
-        setAdsWatchedToStart(0);
-      }
-      setIsProcessing(false);
-    }, 'REQUIRED');
+    playSound('ignite');
+    updateUser({ miningStartedAt: Date.now(), miningClaimed: false });
+    logActivity(currentUser.id, currentUser.name, 'MINING_START', `Started mining reactor`);
   };
 
   const handleClaimReward = () => {
     if (!isMiningComplete || isProcessing) return;
     if (isAdBlockerActive) return alert("Ad-Blocker Detected: Please disable it to claim rewards.");
-    
-    if (isPass) {
-        const success = addCoins(finalReward, 'Mining Reward');
-        if (success) {
-            playSound('collect');
-            updateUser({
-                miningStartedAt: 0,
-                miningLastClaimedAt: Date.now(),
-                miningClaimed: true,
-                is2xMiningUnlocked: false
-            });
-            logActivity(currentUser.id, currentUser.name, 'MINING_CLAIM', `Claimed ${finalReward} coins (VIP)`);
-        }
-        return;
-    }
 
     setIsProcessing(true);
     playAd(() => {
       const nextCount = adsWatchedToClaim + 1;
       setAdsWatchedToClaim(nextCount);
-      if (nextCount >= 3) {
+      if (nextCount >= 2) {
         const success = addCoins(finalReward, 'Mining Reward');
         if (success) {
           playSound('collect');
@@ -171,6 +143,7 @@ const Mining: React.FC = () => {
             miningStartedAt: 0,
             miningLastClaimedAt: Date.now(),
             miningClaimed: true,
+            miningCyclesToday: cyclesToday + 1,
             is2xMiningUnlocked: false
           });
           logActivity(currentUser.id, currentUser.name, 'MINING_CLAIM', `Claimed ${finalReward} coins`);
@@ -323,7 +296,7 @@ const Mining: React.FC = () => {
                     <>
                         <Gift size={28} />
                         <span className="uppercase tracking-widest">
-                            {isPass ? "CLAIM COINS" : (adsWatchedToClaim < 3 ? `VERIFY CLAIM ${adsWatchedToClaim + 1}/3` : "CLAIM REWARDS")}
+                            {isPass ? "CLAIM COINS" : (adsWatchedToClaim < 2 ? `VERIFY CLAIM ${adsWatchedToClaim + 1}/2` : "CLAIM REWARDS")}
                         </span>
                     </>
                 )}
@@ -359,6 +332,14 @@ const Mining: React.FC = () => {
                   })()}
                </div>
             </div>
+         ) : hasReachedDailyLimit ? (
+            <div className="w-full bg-gray-50 dark:bg-gray-800/50 py-6 rounded-[32px] border-2 border-dashed border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-1 opacity-60">
+               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">DAILY LIMIT REACHED</p>
+               <div className="flex items-center gap-2 text-gray-400 font-black text-xl tracking-tighter italic">
+                  <Clock size={22} />
+                  Come back tomorrow
+               </div>
+            </div>
          ) : (
             <div className="space-y-4">
               <button 
@@ -368,19 +349,9 @@ const Mining: React.FC = () => {
               >
                 <div className="flex items-center gap-3 relative z-10">
                    {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Pickaxe size={28} className="group-hover:rotate-45 transition-transform" />}
-                   <span className="uppercase tracking-widest">
-                        {isPass ? "START REACTOR" : (adsWatchedToStart < 3 ? `IGNITE: ${adsWatchedToStart + 1}/3` : "START REACTOR")}
-                   </span>
+                   <span className="uppercase tracking-widest">START REACTOR</span>
                 </div>
               </button>
-              
-              {!isPass && (
-                <div className="flex gap-2 px-6">
-                   {[...Array(3)].map((_, i) => (
-                      <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${adsWatchedToStart > i ? 'bg-blue-500 shadow-lg' : 'bg-gray-200 dark:bg-gray-800'}`} />
-                   ))}
-                </div>
-              )}
             </div>
          )}
       </div>

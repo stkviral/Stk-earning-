@@ -21,8 +21,6 @@ const Profile: React.FC = () => {
 
   if (!currentUser) return null;
 
-  const isVIP = currentUser.tag === UserTag.PASS;
-
   const handleSecurityAudit = async () => {
     playSound('tap');
     setIsAuditing(true);
@@ -78,11 +76,6 @@ const Profile: React.FC = () => {
               <div className="w-24 h-24 rounded-[32px] border-4 border-gray-50 dark:border-gray-800 overflow-hidden shadow-2xl relative z-10">
                 <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
               </div>
-              {isVIP && (
-                <div className="absolute -top-2 -right-2 w-10 h-10 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-xl z-20 border-4 border-white dark:border-gray-900 animate-bounce">
-                  <Crown size={20} fill="currentColor" className="text-blue-900" />
-                </div>
-              )}
             </div>
             
             <div className="space-y-1">
@@ -107,13 +100,32 @@ const Profile: React.FC = () => {
             <div className="text-center space-y-1">
               <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Balance</p>
               <div className="flex items-center justify-center gap-1.5">
-                <span className="text-lg font-black text-gray-900 dark:text-white italic">₹{(currentUser.coins * 0.1).toFixed(2)}</span>
+                <span className="text-lg font-black text-gray-900 dark:text-white italic">{currentUser.coins.toLocaleString()}</span>
+                <span className="text-[10px] font-black text-blue-500 uppercase">STK</span>
               </div>
             </div>
             <div className="text-center space-y-1 border-l border-gray-50 dark:border-gray-800">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Daily Earned</p>
+              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cash Value</p>
               <div className="flex items-center justify-center gap-1.5">
-                <span className="text-lg font-black text-gray-900 dark:text-white italic">₹{(currentUser.dailyEarned * 0.1).toFixed(2)}</span>
+                <span className="text-lg font-black text-gray-900 dark:text-white italic">₹{(currentUser.coins * 0.01).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-50 dark:border-gray-800">
+            <div className="text-center space-y-1">
+              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Daily Streak</p>
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="text-lg font-black text-orange-500 italic">{currentUser.streakDays || 0}</span>
+                <span className="text-[10px] font-black text-orange-400 uppercase">Days</span>
+              </div>
+            </div>
+            <div className="text-center space-y-1 border-l border-gray-50 dark:border-gray-800">
+              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Current Rank</p>
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="text-lg font-black text-purple-500 italic">
+                  {(currentUser.streakDays || 0) >= 30 ? 'Diamond' : (currentUser.streakDays || 0) >= 14 ? 'Platinum' : (currentUser.streakDays || 0) >= 7 ? 'Gold' : (currentUser.streakDays || 0) >= 3 ? 'Silver' : 'Bronze'}
+                </span>
               </div>
             </div>
           </div>

@@ -164,30 +164,6 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                </button>
             </div>
 
-            {user.tag === UserTag.PASS && (
-              <div className="bg-red-600/10 border border-red-600/20 p-5 rounded-[32px] flex items-center justify-between mt-4">
-                 <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-red-600 text-white">
-                       <Crown size={16} />
-                    </div>
-                    <div>
-                       <p className="text-[10px] font-black text-white uppercase tracking-widest">VIP Status</p>
-                       <p className="text-[8px] font-bold text-red-500 uppercase">Active Membership</p>
-                    </div>
-                 </div>
-                 <button 
-                    onClick={() => {
-                      if (window.confirm(`Revoke VIP access for ${user.name}?`)) {
-                        adminActions.updateUserSettings(user.id, { tag: UserTag.NORMAL });
-                      }
-                    }}
-                    className="bg-red-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20"
-                 >
-                    Revoke
-                 </button>
-              </div>
-            )}
-            
             <div className="space-y-3 pt-4">
               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest px-1">Recent Ledger</p>
               {user.transactions.slice(0, 5).map(tx => (
@@ -214,17 +190,13 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
             </div>
             <div className="space-y-3">
               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest px-1">Membership Tier</p>
-              <div className="grid grid-cols-2 gap-3">
-                {(Object.values(UserTag)).map(tag => (
-                  <button 
-                    key={tag}
-                    onClick={() => setEditTag(tag)}
-                    className={`p-4 rounded-2xl border font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${editTag === tag ? 'bg-yellow-500 border-yellow-400 text-white' : 'bg-gray-950 border-gray-800 text-gray-500 hover:border-gray-600'}`}
-                  >
-                    {tag === UserTag.PASS && <Crown size={12} />}
-                    {tag === UserTag.PASS ? 'VIP Pass' : 'Normal'}
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 gap-3">
+                <button 
+                  className="p-4 rounded-2xl border font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 bg-gray-950 border-gray-800 text-gray-500"
+                  disabled
+                >
+                  Normal
+                </button>
               </div>
             </div>
             <div className="space-y-4">
@@ -309,8 +281,8 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
                 <p className="text-[8px] font-bold text-gray-600 uppercase mt-1">{new Date(tx.timestamp).toLocaleString()}</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black">₹{tx.amount.toFixed(0)}</p>
-                <p className="text-[10px] font-black text-gray-500 uppercase">{(tx.amount / COIN_TO_INR_RATE).toFixed(0)} Coins</p>
+                <p className="text-2xl font-black">₹{(tx.amount * COIN_TO_INR_RATE).toFixed(2)}</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase">{tx.amount.toLocaleString()} Coins</p>
               </div>
             </div>
 
@@ -388,11 +360,9 @@ const AdminPanel: React.FC = () => {
     return {
       totalSTK: u.reduce((a, b) => a + b.coins, 0),
       payouts: u.flatMap(us => us.transactions).filter(t => t.type === 'WITHDRAW' && t.status === 'COMPLETED').reduce((a, b) => a + b.amount, 0),
-      active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length,
-      vips: u.filter(us => us.tag === UserTag.PASS).length,
-      vipRevenue: state.passRequests.filter(r => r.status === 'APPROVED').length * (state.settings.vipPrice || 49)
+      active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length
     };
-  }, [state.allUsers, state.passRequests, state.settings.vipPrice]);
+  }, [state.allUsers]);
 
   return (
     <div className="min-h-full bg-gray-950 text-gray-100 pb-32">
@@ -417,7 +387,6 @@ const AdminPanel: React.FC = () => {
       <div className="sticky top-0 z-30 bg-gray-900 border-b border-gray-800 px-4 py-4 flex items-center justify-around shadow-2xl">
         <NavItem tab="dashboard" icon={LayoutDashboard} label="Stats" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="users" icon={Users} label="Users" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
-        <NavItem tab="passes" icon={Crown} label="Pass" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="payouts" icon={CreditCard} label="Pay" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="features" icon={Sliders} label="Config" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
         <NavItem tab="system" icon={Settings} label="System" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
@@ -434,10 +403,9 @@ const AdminPanel: React.FC = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <StatCard label="Supply" value={analytics.totalSTK.toLocaleString()} sub={`₹${(analytics.totalSTK * COIN_TO_INR_RATE).toLocaleString()}`} icon={Coins} color="bg-blue-500/10 text-blue-500" />
-                  <StatCard label="Nodes" value={analytics.active} sub={`${analytics.vips} VIP Members`} icon={Network} color="bg-indigo-500/10 text-indigo-500" />
+                  <StatCard label="Nodes" value={analytics.active} sub="Active Users" icon={Network} color="bg-indigo-500/10 text-indigo-500" />
                   <StatCard label="Paid Out" value={`₹${(analytics.payouts * COIN_TO_INR_RATE).toFixed(0)}`} sub="Total verified payouts" icon={Trophy} color="bg-green-500/10 text-green-500" />
                   <StatCard label="Queue" value={pendingPayouts.length} sub="Pending verification" icon={Clock} color="bg-orange-500/10 text-orange-500" />
-                  <StatCard label="VIP Rev" value={`₹${analytics.vipRevenue.toLocaleString()}`} sub="Total Pass Sales" icon={Crown} color="bg-yellow-500/10 text-yellow-500" />
                   <StatCard label="Suspicious" value={state.allUsers.filter(u => calculateRiskScore(u) > 70).length} sub="High risk score" icon={AlertTriangle} color="bg-red-500/10 text-red-500" />
                 </div>
 
@@ -550,82 +518,6 @@ const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'passes' && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Crown className="text-yellow-500" size={20} />
-                  <h3 className="text-xl font-black uppercase italic tracking-tighter">VIP Pass Requests</h3>
-                </div>
-                {state.passRequests.filter(r => r.status === 'PENDING').length === 0 ? (
-                  <div className="text-center py-12 bg-gray-900 rounded-[40px] border border-gray-800 opacity-50">
-                    <p className="text-[10px] font-black uppercase tracking-widest">No pending pass requests</p>
-                  </div>
-                ) : (
-                  state.passRequests.filter(r => r.status === 'PENDING').map(request => (
-                    <div key={request.id} className="bg-gray-900 p-8 rounded-[48px] border border-gray-800 space-y-6 shadow-2xl">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-base font-black italic text-yellow-500 cursor-pointer" onClick={() => setViewingUserId(request.userId)}>{request.userName}</h4>
-                          <p className="text-[10px] font-black text-gray-500 uppercase">{request.userEmail}</p>
-                        </div>
-                        <span className="text-[8px] font-bold text-gray-600 uppercase">{new Date(request.timestamp).toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Payment Proof</p>
-                        <div className="relative w-full aspect-video rounded-3xl overflow-hidden border border-gray-800 group">
-                          <img src={request.proofUrl} alt="Proof" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              onClick={() => setPreviewImage(request.proofUrl)}
-                              className="p-3 bg-white text-gray-900 rounded-2xl shadow-xl font-black text-[10px] uppercase tracking-widest"
-                            >
-                              View Full Size
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <button 
-                          onClick={() => adminActions.rejectPassRequest(request.id)}
-                          className="flex-1 bg-red-600/10 border border-red-600 text-red-600 py-4 rounded-2xl font-black text-[10px] uppercase"
-                        >
-                          Reject
-                        </button>
-                        <button 
-                          onClick={() => adminActions.approvePassRequest(request.id)}
-                          className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-green-600/20"
-                        >
-                          Approve VIP
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-
-                {state.passRequests.filter(r => r.status !== 'PENDING').length > 0 && (
-                  <div className="pt-8 space-y-4">
-                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-2">Request History</p>
-                    {state.passRequests.filter(r => r.status !== 'PENDING').slice(0, 10).map(request => (
-                      <div key={request.id} className="bg-gray-900/50 p-4 rounded-3xl border border-gray-800 flex items-center justify-between opacity-60">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${request.status === 'APPROVED' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                            {request.status === 'APPROVED' ? <CheckCircle2 size={16} /> : <X size={16} />}
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-white uppercase">{request.userName}</p>
-                            <p className="text-[8px] font-bold text-gray-600 uppercase">{request.status} • {new Date(request.timestamp).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <button onClick={() => setPreviewImage(request.proofUrl)} className="text-gray-600 hover:text-white"><ImageIcon size={14} /></button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {activeTab === 'payouts' && (
               <PayoutsTab setViewingUserId={setViewingUserId} />
             )}
@@ -637,14 +529,10 @@ const AdminPanel: React.FC = () => {
                         <Pickaxe className="text-indigo-500" size={24} />
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Mining Setup</h3>
                      </div>
-                     <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                            <label className="text-[9px] font-black text-gray-600 uppercase">Norm Reward</label>
                            <input type="number" value={state.settings.miningRewardNormal ?? 0} onChange={e => updateSettings({ miningRewardNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-[9px] font-black text-gray-600 uppercase">VIP Reward</label>
-                           <input type="number" value={state.settings.miningRewardVIP ?? 0} onChange={e => updateSettings({ miningRewardVIP: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
                      </div>
                   </div>
@@ -791,7 +679,7 @@ const AdminPanel: React.FC = () => {
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Finance & Logo</h3>
                      </div>
                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                           <div className="space-y-2">
                              <label className="text-[9px] font-black text-gray-600 uppercase">Min Withdrawal</label>
                              <input type="number" value={state.settings.minWithdrawalCoins} onChange={e => updateSettings({ minWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
@@ -799,16 +687,6 @@ const AdminPanel: React.FC = () => {
                           <div className="space-y-2">
                              <label className="text-[9px] font-black text-gray-600 uppercase">Daily Withdraw Limit</label>
                              <input type="number" value={state.settings.dailyWithdrawalLimit || 5000} onChange={e => updateSettings({ dailyWithdrawalLimit: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                             <label className="text-[9px] font-black text-gray-600 uppercase">VIP Price (INR)</label>
-                             <input type="number" value={state.settings.vipPrice || 49} onChange={e => updateSettings({ vipPrice: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
-                          </div>
-                          <div className="space-y-2">
-                             <label className="text-[9px] font-black text-gray-600 uppercase">VIP Duration (Days)</label>
-                             <input type="number" value={state.settings.vipDurationDays || 30} onChange={e => updateSettings({ vipDurationDays: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
                           </div>
                         </div>
                         <div className="space-y-2 pt-4 border-t border-gray-800">

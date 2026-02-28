@@ -1,7 +1,6 @@
 
 export enum UserTag {
-  NORMAL = 'NORMAL',
-  PASS = 'MONTHLY_PASS'
+  NORMAL = 'NORMAL'
 }
 
 export enum UserStatus {
@@ -31,16 +30,6 @@ export interface Transaction {
   timestamp: number;
   rejectionReason?: string;
   paymentTxId?: string;
-}
-
-export interface PassRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  proofUrl: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  timestamp: number;
 }
 
 export interface AdminLog {
@@ -77,7 +66,9 @@ export interface User {
   miningClaimed: boolean;
   miningStartedAt?: number;
   miningLastClaimedAt?: number;
+  miningCyclesToday: number;
   dailyRewardClaimed: boolean;
+  streakDays: number;
   spinsToday: number;
   lastSpinTimestamp: number;
   extraSpinWatchedToday: boolean;
@@ -89,10 +80,8 @@ export interface User {
   upiId?: string;
   transactions: Transaction[];
   referralHistory: any[];
-  passHistory: any[];
   is2xMiningUnlocked: boolean;
   adsFor2xMining: number;
-  passPurchaseTimestamp?: number;
   deviceId: string;
   lastIp: string;
   riskScore: number;
@@ -108,6 +97,7 @@ export interface AppSettings {
   videosEnabled: boolean;
   referralsEnabled: boolean;
   adsEnabled: boolean;
+  withdrawalsEnabled: boolean;
   systemNotification: string;
   appVersion: string;
   minVersionRequired: string;
@@ -116,9 +106,8 @@ export interface AppSettings {
   adRewardCoins: number;
   referralReward: number;
   miningDurationNormal: number;
-  miningDurationVIP: number;
   miningRewardNormal: number;
-  miningRewardVIP: number;
+  miningCyclesPerDayNormal: number;
   miningBoostAdsRequired: number;
   spinRewards: number[];
   maxDailySpinsNormal: number;
@@ -130,10 +119,9 @@ export interface AppSettings {
   adminUpiId: string;
   maxDailyAds: number;
   dailyWithdrawalLimit: number;
-  vipPrice: number;
-  vipDurationDays: number;
   spinProbabilities: Record<string, number>;
   emergencyRewardReduction: number;
+  globalRewardMultiplier: number;
 }
 
 export interface AppState {
@@ -144,14 +132,12 @@ export interface AppState {
   settings: AppSettings;
   logs: AdminLog[];
   activityLogs: ActivityLog[];
-  passRequests: PassRequest[];
   adminUsers: AdminUser[];
 }
 
-export const COIN_TO_INR_RATE = 10 / 100;
-export const PASS_PRICE_INR = 49;
+export const COIN_TO_INR_RATE = 0.01;
 export const AD_GAP_MS = 30000;
-export const MIN_WITHDRAWAL_COINS = 500;
+export const MIN_WITHDRAWAL_COINS = 15000;
 export const ADMIN_EMAIL = 'admin@stk.com';
 
 declare global {

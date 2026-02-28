@@ -15,7 +15,6 @@ import Profile from './pages/Profile';
 import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
-import MonthlyPass from './pages/MonthlyPass';
 import Leaderboard from './pages/Leaderboard';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
@@ -33,8 +32,6 @@ interface AppContextType {
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
-  buyPass: () => void;
-  submitPassRequest: (proofUrl: string) => void;
   withdraw: (upiId: string, amount: number) => string | null;
   setActiveTab: (tab: string) => void;
   calculateRiskScore: (user: User) => number;
@@ -50,8 +47,6 @@ interface AppContextType {
     resetCooldowns: (userId: string, type: 'MINING' | 'SPIN' | 'ALL', reason: string) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
-    approvePassRequest: (requestId: string) => void;
-    rejectPassRequest: (requestId: string) => void;
   }
 }
 
@@ -70,32 +65,31 @@ const DEFAULT_SETTINGS: AppSettings = {
   videosEnabled: true,
   referralsEnabled: true,
   adsEnabled: true,
-  systemNotification: "Welcome to STK Earning! VIP members get 2x Mining rewards!",
+  withdrawalsEnabled: true,
+  systemNotification: "Welcome to STK Earning!",
   appVersion: "1.0.0",
   minVersionRequired: "1.0.0",
-  dailyCapNormal: 100,
+  dailyCapNormal: 200,
   dailyBonusReward: 5,
   adRewardCoins: 1,
   referralReward: 50,
   miningDurationNormal: 24 * 60 * 60 * 1000,
-  miningDurationVIP: 12 * 60 * 60 * 1000,
-  miningRewardNormal: 25,
-  miningRewardVIP: 40,
+  miningRewardNormal: 10,
+  miningCyclesPerDayNormal: 1,
   miningBoostAdsRequired: 20,
-  spinRewards: [1, 2, 3, 5, 2, 4, 1, 10],
-  maxDailySpinsNormal: 5,
+  spinRewards: [1, 2, 3, 5, 20],
+  maxDailySpinsNormal: 3,
   spinCooldownMinutes: 0,
-  withdrawalFeeNormal: 7.5,
-  minWithdrawalCoins: 500,
-  withdrawalCooldownHours: 24,
-  paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=49&cu=INR",
+  withdrawalFeeNormal: 2,
+  minWithdrawalCoins: 15000,
+  withdrawalCooldownHours: 48,
+  paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=500&cu=INR",
   adminUpiId: "stk@upi",
   maxDailyAds: 20,
   dailyWithdrawalLimit: 5000,
-  vipPrice: 49,
-  vipDurationDays: 30,
-  spinProbabilities: { "1": 40, "2": 30, "3": 15, "4": 8, "5": 5, "10": 2 },
-  emergencyRewardReduction: 0
+  spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "20": 1 },
+  emergencyRewardReduction: 0,
+  globalRewardMultiplier: 1
 };
 
 const App: React.FC = () => {
@@ -107,10 +101,9 @@ const App: React.FC = () => {
       allUsers: parsed?.allUsers || [],
       isLoggedIn: !!parsed?.currentUser,
       logoUrl: parsed?.logoUrl || '',
-      settings: parsed?.settings || DEFAULT_SETTINGS,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
       logs: parsed?.logs || [],
       activityLogs: parsed?.activityLogs || [],
-      passRequests: parsed?.passRequests || [],
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       isAdBlockerActive: false,
       isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === parsed?.currentUser?.email),
@@ -169,29 +162,22 @@ const App: React.FC = () => {
 
     // Daily Reset
     if (now - lastReset >= dayInMs) {
+      const missedDay = now - lastReset >= dayInMs * 2;
       Object.assign(updates, {
         dailyEarned: 0,
         adsWatchedToday: 0,
         spinsToday: 0,
         extraSpinWatchedToday: false,
         dailyRewardClaimed: false,
-        lastResetTimestamp: now
+        lastResetTimestamp: now,
+        streakDays: missedDay ? 0 : state.currentUser.streakDays
       });
-    }
-
-    // Pass Expiry
-    if (state.currentUser.tag === UserTag.PASS && state.currentUser.passPurchaseTimestamp) {
-      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-      if (now - state.currentUser.passPurchaseTimestamp > thirtyDays) {
-        Object.assign(updates, { tag: UserTag.NORMAL });
-        logActivity(state.currentUser.id, state.currentUser.name, 'PASS_EXPIRED', 'Monthly Pass has expired.');
-      }
     }
 
     if (Object.keys(updates).length > 0) {
       updateUser(updates);
     }
-  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp, state.currentUser?.tag, state.currentUser?.passPurchaseTimestamp]);
+  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp]);
 
   useEffect(() => {
     checkAdBlocker();
@@ -201,9 +187,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('stk_app_state', JSON.stringify(state));
-    const isVIP = state.currentUser?.tag === UserTag.PASS;
-    const effectiveTheme = isVIP ? state.theme : 'dark';
-    if (effectiveTheme === 'dark') {
+    if (state.theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
@@ -213,22 +197,34 @@ const App: React.FC = () => {
   const updateLogo = (url: string) => setState(prev => ({ ...prev, logoUrl: url }));
   const updateSettings = (updates: Partial<AppSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...updates } }));
 
-  const addCoins = useCallback((amount: number, method: string): boolean => {
+  const addCoins = useCallback((baseAmount: number, method: string): boolean => {
     if (!state.currentUser) return false;
     if (state.settings.adsEnabled && state.isAdBlockerActive) {
       alert("Reward Blocked: Please disable your ad-blocker to receive coins.");
       return false;
     }
-    const isPass = state.currentUser.tag === UserTag.PASS;
+    
+    // Apply global multiplier and emergency reduction
+    let amount = baseAmount;
+    if (amount > 0) {
+      amount = Math.floor(amount * (state.settings.globalRewardMultiplier || 1));
+      if (state.settings.emergencyRewardReduction > 0) {
+        amount = Math.floor(amount * (1 - (state.settings.emergencyRewardReduction / 100)));
+      }
+    }
+
     const todayEarned = state.currentUser.dailyEarned || 0;
-    if (!isPass && todayEarned + amount > state.settings.dailyCapNormal && amount > 0) {
-      const allowed = state.settings.dailyCapNormal - todayEarned;
+    const dailyCap = state.settings.dailyCapNormal;
+
+    if (todayEarned + amount > dailyCap && amount > 0) {
+      const allowed = dailyCap - todayEarned;
       if (allowed <= 0) {
         alert("Daily earning cap reached!");
         return false;
       }
       amount = allowed;
     }
+
     const transaction: Transaction = {
       id: Math.random().toString(36).substring(2, 9),
       amount,
@@ -302,7 +298,9 @@ const App: React.FC = () => {
         adsWatchedToday: 0,
         lastAdTimestamp: 0,
         miningClaimed: false,
+        miningCyclesToday: 0,
         dailyRewardClaimed: false,
+        streakDays: 0,
         spinsToday: 0,
         lastSpinTimestamp: 0,
         extraSpinWatchedToday: false,
@@ -311,7 +309,6 @@ const App: React.FC = () => {
         adsBlocked: false,
         transactions: [],
         referralHistory: [],
-        passHistory: [],
         is2xMiningUnlocked: false,
         adsFor2xMining: 0,
         deviceId: 'DEV-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
@@ -343,66 +340,32 @@ const App: React.FC = () => {
   };
   const toggleTheme = useCallback(() => {
     setState(prev => {
-      const isVIP = prev.currentUser?.tag === UserTag.PASS;
-      if (!isVIP) { alert("Elite Feature: Theme customization is for VIP members."); return prev; }
       return { ...prev, theme: prev.theme === 'light' ? 'dark' : 'light' };
     });
   }, []);
 
-  const buyPass = useCallback(() => {
-    // This is now a legacy function or can be used for direct admin grant
-    // We'll keep it for now but the UI will use submitPassRequest
-    const confirmBuy = window.confirm("Activate VIP Status? Enjoy zero fees, 2x mining, and custom themes for 30 days.");
-    if (!confirmBuy) return;
-    setState(prev => {
-      if (!prev.currentUser) return prev;
-      const now = Date.now();
-      const updatedUser = {
-        ...prev.currentUser,
-        tag: UserTag.PASS,
-        passPurchaseTimestamp: now,
-        passHistory: [{ date: now, type: 'PURCHASE' }, ...(prev.currentUser.passHistory || [])]
-      };
-      return { ...prev, currentUser: updatedUser, allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u) };
-    });
-    alert("VIP Upgrade Successful! Welcome to the Elite Tier.");
-  }, []);
-
-  const submitPassRequest = useCallback((proofUrl: string) => {
-    if (!state.currentUser) return;
-    const newRequest: PassRequest = {
-      id: Math.random().toString(36).substring(2, 9),
-      userId: state.currentUser.id,
-      userName: state.currentUser.name,
-      userEmail: state.currentUser.email,
-      proofUrl,
-      status: 'PENDING',
-      timestamp: Date.now()
-    };
-    setState(prev => ({
-      ...prev,
-      passRequests: [newRequest, ...prev.passRequests]
-    }));
-    logActivity(state.currentUser.id, state.currentUser.name, 'PASS_REQUEST', 'Submitted a VIP pass purchase request');
-    alert("Request Submitted! Admin will verify your payment soon.");
-  }, [state.currentUser, logActivity]);
-
   const withdraw = (upiId: string, amount: number): string | null => {
     if (!state.currentUser) return "User session error";
+    if (!state.settings.withdrawalsEnabled) return "Withdrawals are temporarily disabled by the administrator.";
     if (state.currentUser.walletFrozen) return "Your wallet is frozen.";
     if (state.currentUser.coins < amount) return "Insufficient balance";
     if (amount < state.settings.minWithdrawalCoins) return `Minimum withdrawal is ${state.settings.minWithdrawalCoins} coins.`;
-    const cooldownMs = (state.settings.withdrawalCooldownHours || 24) * 60 * 60 * 1000;
+    const cooldownMs = (state.settings.withdrawalCooldownHours || 48) * 60 * 60 * 1000;
     const nextAllowed = (state.currentUser.lastWithdrawalTimestamp || 0) + cooldownMs;
     if (Date.now() < nextAllowed) return "Withdrawal Cooldown: Please wait before next request.";
     const upiRegex = /^[\w\.-]+@[\w\.-]+$/;
     if (!upiRegex.test(upiId)) return "Invalid UPI ID format.";
+    
+    const feePercentage = state.settings.withdrawalFeeNormal;
+    const feeAmount = Math.floor(amount * (feePercentage / 100));
+    const finalAmount = amount - feeAmount;
+
     const tx: Transaction = {
       id: 'WD-' + Math.random().toString(36).substring(2, 9),
-      amount, type: 'WITHDRAW', method: 'UPI: ' + upiId, status: 'PENDING', timestamp: Date.now()
+      amount: finalAmount, type: 'WITHDRAW', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
     };
     updateUser({ coins: state.currentUser.coins - amount, transactions: [tx, ...state.currentUser.transactions], upiId, lastWithdrawalTimestamp: Date.now() });
-    logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(amount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId}`);
+    logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
     return null;
   };
 
@@ -494,40 +457,6 @@ const App: React.FC = () => {
       if (!user) return alert("User not found!");
       setState(prev => ({ ...prev, currentUser: user }));
       setActiveTab('home');
-    },
-    approvePassRequest: (requestId: string) => {
-      setState(prev => {
-        const request = prev.passRequests.find(r => r.id === requestId);
-        if (!request) return prev;
-        
-        const now = Date.now();
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== request.userId) return u;
-          return {
-            ...u,
-            tag: UserTag.PASS,
-            passPurchaseTimestamp: now,
-            passHistory: [{ date: now, type: 'PURCHASE', requestId }, ...(u.passHistory || [])]
-          };
-        });
-        
-        const updatedUser = newAllUsers.find(u => u.id === request.userId);
-        
-        return {
-          ...prev,
-          allUsers: newAllUsers,
-          currentUser: prev.currentUser?.id === request.userId ? (updatedUser || null) : prev.currentUser,
-          passRequests: prev.passRequests.map(r => r.id === requestId ? { ...r, status: 'APPROVED' } : r)
-        };
-      });
-      logAdminAction('PASS_APPROVE', requestId, `Approved pass request for ${requestId}`);
-    },
-    rejectPassRequest: (requestId: string) => {
-      setState(prev => ({
-        ...prev,
-        passRequests: prev.passRequests.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r)
-      }));
-      logAdminAction('PASS_REJECT', requestId, `Rejected pass request for ${requestId}`);
     }
   };
 
@@ -563,7 +492,6 @@ const App: React.FC = () => {
     }
     if (activeTab === 'privacy') return <PrivacyPolicy />;
     if (activeTab === 'faq') return <FAQ />;
-    if (activeTab === 'pass') return <MonthlyPass />;
     if (activeTab === 'profile') return <Profile />;
     switch (activeTab) {
       case 'home': return <Dashboard />;
@@ -589,7 +517,8 @@ const App: React.FC = () => {
     if (sharedIp > 0) score += sharedIp * 10;
 
     // Check earning velocity (if they earned more than daily cap)
-    if (user.dailyEarned > state.settings.dailyCapNormal * 2) score += 30;
+    const dailyCap = state.settings.dailyCapNormal;
+    if (user.dailyEarned > dailyCap * 2) score += 30;
 
     // Check referral abuse (if many referrals have same IP)
     const suspiciousReferrals = state.allUsers.filter(u => u.referredBy === user.referralCode && u.lastIp === user.lastIp).length;
@@ -601,7 +530,7 @@ const App: React.FC = () => {
   return (
     <AppContext.Provider value={{
       state, updateUser, updateLogo, updateSettings, addCoins, playAd, login, logout, 
-      toggleTheme, buyPass, submitPassRequest, withdraw, setActiveTab, calculateRiskScore,
+      toggleTheme, withdraw, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, adminActions
     }}>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-white dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
