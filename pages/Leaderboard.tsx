@@ -17,7 +17,6 @@ const ACHIEVEMENTS = [
   { id: 'miner_novice', title: 'Novice Miner', desc: 'Claim 5 mining rewards.', icon: Pickaxe, color: 'text-blue-500', bg: 'bg-blue-500/10', requirement: 5, type: 'mining' },
   { id: 'spinner_lucky', title: 'Lucky Spinner', desc: 'Spin the wheel 10 times.', icon: Disc, color: 'text-orange-500', bg: 'bg-orange-500/10', requirement: 10, type: 'spin' },
   { id: 'ad_watcher', title: 'Ad Watcher', desc: 'Watch 20 video ads.', icon: PlayCircle, color: 'text-purple-500', bg: 'bg-purple-500/10', requirement: 20, type: 'video' },
-  { id: 'daily_streak', title: 'Daily Devotee', desc: 'Claim 7 daily bonuses.', icon: Gift, color: 'text-green-500', bg: 'bg-green-500/10', requirement: 7, type: 'daily' },
   { id: 'wealthy', title: 'Wealthy', desc: 'Accumulate 10,000 STK Coins.', icon: Crown, color: 'text-yellow-500', bg: 'bg-yellow-500/10', requirement: 10000, type: 'coins' },
 ];
 
@@ -43,14 +42,12 @@ const Leaderboard: React.FC = () => {
     let miningCount = 0;
     let spinCount = 0;
     let videoCount = 0;
-    let dailyCount = 0;
 
     currentUser.transactions.forEach(tx => {
       if (tx.type === 'EARN') {
         if (tx.method === 'Mining Reward') miningCount++;
         if (tx.method === 'Lucky Spin') spinCount++;
         if (tx.method === 'Video Watch') videoCount++;
-        if (tx.method === 'Daily Bonus') dailyCount++;
       }
     });
 
@@ -58,8 +55,7 @@ const Leaderboard: React.FC = () => {
       coins: totalCoins,
       mining: miningCount,
       spin: spinCount,
-      video: videoCount,
-      daily: dailyCount
+      video: videoCount
     };
   }, [currentUser]);
 

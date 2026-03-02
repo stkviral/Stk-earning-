@@ -274,7 +274,7 @@ const Dashboard: React.FC = () => {
                   <span className={`text-[8px] font-black uppercase tracking-widest ${
                     isCompleted || isCurrent ? 'text-gray-900 dark:text-white' : 'text-gray-400'
                   }`}>
-                    {day === 7 ? '25' : '5'} STK
+                    REWARD
                   </span>
                 </div>
               );
@@ -312,7 +312,7 @@ const Dashboard: React.FC = () => {
               {currentUser.dailyRewardClaimed ? 'Claimed Today' : 
                isDeviceClaimedToday ? 'Device Limit Reached' :
                !canClaim ? 'Complete Tasks to Unlock' : 
-               `Claim ${rewardAmount} STK Reward`}
+               `Claim Reward`}
             </button>
           </div>
         </div>
