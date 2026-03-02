@@ -236,14 +236,14 @@ const Wallet: React.FC = () => {
   if (!currentUser) return null;
 
   const currentBalanceINR = currentUser.coins * COIN_TO_INR_RATE;
-  const feePercent = settings.withdrawalFeeNormal || 2;
+  const feePercent = settings.withdrawalFeeNormal || 0;
   
   const numAmount = typeof withdrawAmount === 'string' ? parseInt(withdrawAmount) || 0 : withdrawAmount;
   const grossINR = numAmount * COIN_TO_INR_RATE;
   const feeINR = grossINR * (feePercent / 100);
   const netINR = isNaN(grossINR - feeINR) ? 0 : (grossINR - feeINR);
 
-  const minThreshold = settings.minWithdrawalCoins || MIN_WITHDRAWAL_COINS;
+  const minThreshold = settings.minWithdrawalCoins || 5000;
   const progressToMin = Math.min(100, (currentUser.coins / minThreshold) * 100);
 
   const handleWithdrawInitiate = (e: React.FormEvent) => {
@@ -272,7 +272,7 @@ const Wallet: React.FC = () => {
     return [...currentUser.transactions]
       .filter(tx => {
         if (filter === 'ALL') return true;
-        if (filter === 'EARN') return tx.type === 'EARN' || (tx.type === 'ADJUST' && tx.amount > 0);
+        if (filter === 'EARN') return tx.type !== 'WITHDRAW' && tx.amount > 0;
         return tx.type === filter;
       })
       .sort((a, b) => b.timestamp - a.timestamp);

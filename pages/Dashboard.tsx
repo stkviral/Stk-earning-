@@ -35,7 +35,7 @@ const FloatingParticle: React.FC<{ index: number }> = ({ index }) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, buyPass, setActiveTab, logActivity } = useApp();
+  const { state, playAd, claimDailyCheckIn, setActiveTab, logActivity, updateDeviceClaim } = useApp();
   const { currentUser, settings } = state;
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [showNotification, setShowNotification] = useState(true);
@@ -74,21 +74,29 @@ const Dashboard: React.FC = () => {
   // Mining Status
   const isMiningActive = currentUser.miningStartedAt && Date.now() < (currentUser.miningStartedAt + settings.miningDurationNormal);
 
+  const currentDay = (currentUser.streakDays || 0) % 7 + 1;
+  const rewardAmount = currentDay === 7 ? 25 : 5;
+
+  const hasWatchedAd = currentUser.adsWatchedToday > 0;
+  const hasActivity = currentUser.miningCyclesToday > 0 || currentUser.spinsToday > 0;
+  
+  const lastDeviceClaim = state.deviceClaims[currentUser.deviceId] || 0;
+  const isDeviceClaimedToday = Date.now() - lastDeviceClaim < 24 * 60 * 60 * 1000;
+  
+  const canClaim = hasWatchedAd && hasActivity && !isDeviceClaimedToday;
+
   const handleClaimDailyBonus = () => {
     if (currentUser.dailyRewardClaimed) return;
-    playAd(() => {
-      const streakBonus = currentUser.streakDays || 0;
-      const totalReward = settings.dailyBonusReward + streakBonus;
-      const success = addCoins(totalReward, 'Daily Bonus');
-      if (success) {
-        updateUser({ 
-          dailyRewardClaimed: true, 
-          lastResetTimestamp: Date.now(),
-          streakDays: streakBonus + 1
-        });
-        logActivity(currentUser.id, currentUser.name, 'DAILY_BONUS', `Claimed ${totalReward} coins (Streak: ${streakBonus + 1})`);
-      }
-    }, 'REQUIRED');
+    if (isDeviceClaimedToday) {
+      alert("Reward already claimed on this device today.");
+      return;
+    }
+    if (!canClaim) {
+      alert("Please watch at least 1 ad and complete 1 mining or spin session today to unlock the daily reward.");
+      return;
+    }
+    
+    claimDailyCheckIn();
   };
 
   return (
@@ -232,35 +240,81 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Daily Bonus Section (Guided Action) */}
-      <div 
-        onClick={handleClaimDailyBonus}
-        className={`relative z-10 p-6 rounded-[40px] border-2 transition-all active:scale-[0.98] group overflow-hidden ${
-          currentUser.dailyRewardClaimed 
-          ? 'bg-gray-100 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 opacity-60' 
-          : 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-500/30 shadow-2xl'
-        }`}
-      >
-        {!currentUser.dailyRewardClaimed && (
-           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.1),transparent_70%)] animate-pulse" />
-        )}
-        <div className="flex items-center justify-between relative z-10">
-           <div className="flex items-center gap-5">
-              <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center shadow-xl transition-all duration-500 group-hover:rotate-12 ${
-                currentUser.dailyRewardClaimed ? 'bg-gray-200 dark:bg-gray-800 text-gray-400' : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-green-500/30'
-              }`}>
-                <Gift size={32} className={currentUser.dailyRewardClaimed ? '' : 'animate-bounce'} />
+      {/* 3. 7-Day Check-In Section */}
+      <div className="relative z-10 space-y-4">
+        <div className="flex justify-between items-end px-1">
+          <h3 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">7-Day Check-In</h3>
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+            {currentUser.dailyRewardClaimed ? `Next in: ${timeLeft}` : 'Available Now'}
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-[40px] border border-gray-100 dark:border-gray-800 shadow-xl space-y-6">
+          {/* Progress Bar */}
+          <div className="flex justify-between relative">
+            <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-100 dark:bg-gray-800 -translate-y-1/2 rounded-full z-0" />
+            <div 
+              className="absolute top-1/2 left-0 h-1 bg-green-500 -translate-y-1/2 rounded-full z-0 transition-all duration-1000"
+              style={{ width: `${((currentDay - 1) / 6) * 100}%` }}
+            />
+            
+            {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+              const isCompleted = day < currentDay || (day === currentDay && currentUser.dailyRewardClaimed);
+              const isCurrent = day === currentDay && !currentUser.dailyRewardClaimed;
+              
+              return (
+                <div key={day} className="relative z-10 flex flex-col items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500 ${
+                    isCompleted ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' :
+                    isCurrent ? 'bg-yellow-400 text-blue-900 shadow-lg shadow-yellow-400/30 animate-bounce' :
+                    'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                  }`}>
+                    {isCompleted ? <CheckCircle2 size={14} /> : `D${day}`}
+                  </div>
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${
+                    isCompleted || isCurrent ? 'text-gray-900 dark:text-white' : 'text-gray-400'
+                  }`}>
+                    {day === 7 ? '25' : '5'} STK
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Claim Button & Conditions */}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2">
+              <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${hasWatchedAd ? 'text-green-500' : 'text-gray-400'}`}>
+                {hasWatchedAd ? <CheckCircle2 size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-300 dark:border-gray-700" />}
+                Watch 1 Ad Today ({currentUser.adsWatchedToday}/1)
               </div>
-              <div className="space-y-1">
-                <h4 className={`text-xl font-black uppercase italic tracking-tighter ${currentUser.dailyRewardClaimed ? 'text-gray-500 dark:text-gray-400' : 'text-green-900 dark:text-green-100'}`}>Daily Reward</h4>
-                <p className={`text-[10px] font-black uppercase tracking-widest ${currentUser.dailyRewardClaimed ? 'text-gray-400 dark:text-gray-500' : 'text-green-600/80 dark:text-green-400/80'}`}>
-                  {currentUser.dailyRewardClaimed ? `Next in: ${timeLeft}` : `Claim +${settings.dailyBonusReward + (currentUser.streakDays || 0)} STK (Streak: ${currentUser.streakDays || 0})`}
-                </p>
+              <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${hasActivity ? 'text-green-500' : 'text-gray-400'}`}>
+                {hasActivity ? <CheckCircle2 size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-gray-300 dark:border-gray-700" />}
+                Complete 1 Mining or Spin
               </div>
-           </div>
-           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${currentUser.dailyRewardClaimed ? 'bg-gray-200 dark:bg-gray-800 text-gray-400' : 'bg-white dark:bg-green-900/40 text-green-600 dark:text-green-400 shadow-sm'}`}>
-              {currentUser.dailyRewardClaimed ? <CheckCircle2 size={24} /> : <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />}
-           </div>
+              {isDeviceClaimedToday && !currentUser.dailyRewardClaimed && (
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500">
+                  <ShieldAlert size={12} />
+                  Device limit reached
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleClaimDailyBonus}
+              disabled={currentUser.dailyRewardClaimed || !canClaim || isDeviceClaimedToday}
+              className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                currentUser.dailyRewardClaimed ? 'bg-gray-100 dark:bg-gray-800 text-gray-400' :
+                (canClaim && !isDeviceClaimedToday) ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 active:scale-95' :
+                'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {currentUser.dailyRewardClaimed ? 'Claimed Today' : 
+               isDeviceClaimedToday ? 'Device Limit Reached' :
+               !canClaim ? 'Complete Tasks to Unlock' : 
+               `Claim ${rewardAmount} STK Reward`}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -283,54 +337,6 @@ const Dashboard: React.FC = () => {
                <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
             </div>
           </div>
-      </div>
-
-      {/* 5. Daily Boost - Ad-based temporary 2x */}
-      <div 
-        onClick={() => {
-          playSound('tap');
-          playAd(() => {
-            updateUser({
-              is2xMiningUnlocked: true,
-              adsFor2xMining: 10 // Or whatever logic you want, maybe just a simple boost
-            });
-            alert("Daily Boost Activated! Enjoy faster earnings.");
-          }, 'REWARD');
-        }} 
-        className="bg-gray-950 dark:bg-black rounded-[56px] p-10 shadow-4xl relative overflow-hidden group border border-white/10 active:scale-95 transition-all z-10"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_70%)]" />
-        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-1000 pointer-events-none">
-           <Zap size={180} />
-        </div>
-        
-        <div className="relative z-10 space-y-8">
-          <div className="flex items-center gap-6">
-            <div className="w-18 h-18 bg-gradient-to-br from-yellow-400 to-orange-600 text-blue-950 rounded-[28px] flex items-center justify-center shadow-3xl animate-float p-4">
-               <Zap size={32} fill="currentColor" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] text-yellow-500 font-black uppercase tracking-[0.5em] italic">Daily Boost</p>
-              <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">2X EARNINGS</h3>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-y-4 gap-x-6 bg-white/5 p-6 rounded-[36px] border border-white/5 backdrop-blur-md">
-             {[
-               { text: "Double Mining Speed", icon: <Cpu size={12} /> },
-               { text: "Watch Ad to Activate", icon: <PlayCircle size={12} /> }
-             ].map((item, i) => (
-               <div key={i} className="flex items-center gap-3">
-                  <div className="text-yellow-500">{item.icon}</div>
-                  <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{item.text}</span>
-               </div>
-             ))}
-          </div>
-          
-          <button className="w-full bg-white text-gray-950 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-2xl flex items-center justify-center gap-4 transition-all border-b-[6px] border-gray-200 active:border-b-0 active:translate-y-1">
-             ACTIVATE BOOST <ChevronRight size={18} />
-          </button>
-        </div>
       </div>
 
       {/* Global Broadcast Notification */}

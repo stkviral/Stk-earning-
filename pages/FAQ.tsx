@@ -68,17 +68,17 @@ const FAQ: React.FC = () => {
         <FAQItem 
           icon={<Zap size={24} />}
           question="Daily Earning Limit" 
-          answer="Standard accounts are limited to 100 Coins daily. Upgrade to VIP for unlimited earnings and more."
+          answer="Accounts are limited to 100 Coins daily."
         />
         <FAQItem 
           icon={<Pickaxe size={24} />}
           question="Mining System" 
-          answer="Mining is a 24-hour cycle. Watch 2 ads to start mining and claim your rewards. VIP members get 2x rewards automatically."
+          answer="Mining is a 24-hour cycle. Watch 2 ads to start mining and claim your rewards."
         />
         <FAQItem 
           icon={<Disc size={24} />}
           question="Lucky Spin" 
-          answer="Test your luck daily. Standard accounts get 5 spins per day. VIP members get unlimited spins."
+          answer="Test your luck daily. You get 5 spins per day."
         />
       </div>
 
@@ -95,7 +95,7 @@ const FAQ: React.FC = () => {
         <FAQItem 
           icon={<ShieldCheck size={24} />}
           question="Withdrawal Fees" 
-          answer="Standard withdrawals have a 7.5% fee. This fee is completely waived (0%) for VIP members."
+          answer="Withdrawals may have a small processing fee depending on network conditions."
         />
         <FAQItem 
           icon={<Users size={24} />}

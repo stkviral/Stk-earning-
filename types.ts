@@ -23,8 +23,9 @@ export interface AdminUser {
 
 export interface Transaction {
   id: string;
+  userId: string;
   amount: number;
-  type: 'EARN' | 'WITHDRAW' | 'ADJUST';
+  type: 'MINING' | 'SPIN' | 'CHECKIN' | 'WITHDRAWAL' | 'AD' | 'REFERRAL' | 'ADJUST';
   method: string;
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
   timestamp: number;
@@ -69,6 +70,7 @@ export interface User {
   miningCyclesToday: number;
   dailyRewardClaimed: boolean;
   streakDays: number;
+  lastCheckInTimestamp: number;
   spinsToday: number;
   lastSpinTimestamp: number;
   extraSpinWatchedToday: boolean;
@@ -80,8 +82,6 @@ export interface User {
   upiId?: string;
   transactions: Transaction[];
   referralHistory: any[];
-  is2xMiningUnlocked: boolean;
-  adsFor2xMining: number;
   deviceId: string;
   lastIp: string;
   riskScore: number;
@@ -108,7 +108,6 @@ export interface AppSettings {
   miningDurationNormal: number;
   miningRewardNormal: number;
   miningCyclesPerDayNormal: number;
-  miningBoostAdsRequired: number;
   spinRewards: number[];
   maxDailySpinsNormal: number;
   spinCooldownMinutes: number;
@@ -133,6 +132,7 @@ export interface AppState {
   logs: AdminLog[];
   activityLogs: ActivityLog[];
   adminUsers: AdminUser[];
+  deviceClaims: Record<string, number>;
 }
 
 export const COIN_TO_INR_RATE = 0.01;

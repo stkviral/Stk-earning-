@@ -151,7 +151,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">STK Earning</h1>
         <div className="flex items-center justify-center gap-2">
            <Sparkles size={12} className="text-blue-500 animate-pulse" />
-           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Premium Rewards Platform</p>
+           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Rewards Platform</p>
         </div>
       </div>
 

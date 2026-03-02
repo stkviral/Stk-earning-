@@ -90,8 +90,8 @@ const Profile: React.FC = () => {
               <div className="bg-blue-600/10 px-4 py-1.5 rounded-full border border-blue-600/20">
                 <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">ID: {currentUser.id.slice(0, 8)}</span>
               </div>
-              <div className={`px-4 py-1.5 rounded-full border ${isVIP ? 'bg-yellow-400/10 border-yellow-400/20 text-yellow-600' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'}`}>
-                <span className="text-[9px] font-black uppercase tracking-widest">{isVIP ? 'Elite Member' : 'Standard User'}</span>
+              <div className="px-4 py-1.5 rounded-full border bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500">
+                <span className="text-[9px] font-black uppercase tracking-widest">Standard User</span>
               </div>
             </div>
           </div>

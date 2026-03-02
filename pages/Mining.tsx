@@ -18,7 +18,7 @@ const TechGrid: React.FC = () => (
   </div>
 );
 
-const Particle: React.FC<{ index: number; isPremium: boolean }> = ({ index, isPremium }) => {
+const Particle: React.FC<{ index: number }> = ({ index }) => {
   const style = useMemo(() => {
     const angle = Math.random() * Math.PI * 2;
     const distance = 40 + Math.random() * 80;
@@ -36,9 +36,7 @@ const Particle: React.FC<{ index: number; isPremium: boolean }> = ({ index, isPr
 
   return (
     <div 
-      className={`absolute w-1 h-1 rounded-full animate-spark pointer-events-none z-20 ${
-        isPremium ? 'bg-orange-400 shadow-[0_0_10px_#fb923c]' : 'bg-blue-400 shadow-[0_0_8px_#60a5fa]'
-      }`}
+      className={`absolute w-1 h-1 rounded-full animate-spark pointer-events-none z-20 bg-blue-400 shadow-[0_0_8px_#60a5fa]`}
       style={style}
     />
   );
@@ -67,7 +65,7 @@ const TapRipple: React.FC<{ x: number; y: number }> = ({ x, y }) => (
 );
 
 const Mining: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, setActiveTab, logActivity } = useApp();
+  const { state, playAd, claimMiningReward, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [adsWatchedToStart, setAdsWatchedToStart] = useState(0);
   const [adsWatchedToClaim, setAdsWatchedToClaim] = useState(0);
@@ -98,8 +96,7 @@ const Mining: React.FC = () => {
     );
   }
 
-  const isBoosted = currentUser.is2xMiningUnlocked;
-  const finalReward = isBoosted ? settings.miningRewardNormal * 2 : settings.miningRewardNormal;
+  const finalReward = settings.miningRewardNormal;
   
   const effectiveDuration = settings.miningDurationNormal;
   const maxCycles = settings.miningCyclesPerDayNormal;
@@ -116,7 +113,6 @@ const Mining: React.FC = () => {
   const isCooldownActive = currentTime < cooldownEndedAt && !isMiningActive && !isMiningComplete;
 
   const progressPercent = isMiningActive ? Math.min(100, ((currentTime - miningStartedAt) / effectiveDuration) * 100) : (isMiningComplete ? 100 : 0);
-  const isVisualPremium = isBoosted;
 
   const handleStartMining = () => {
     if (isMiningActive || isMiningComplete || isCooldownActive || isProcessing || hasReachedDailyLimit) return;
@@ -136,17 +132,9 @@ const Mining: React.FC = () => {
       const nextCount = adsWatchedToClaim + 1;
       setAdsWatchedToClaim(nextCount);
       if (nextCount >= 2) {
-        const success = addCoins(finalReward, 'Mining Reward');
+        const success = claimMiningReward();
         if (success) {
           playSound('collect');
-          updateUser({
-            miningStartedAt: 0,
-            miningLastClaimedAt: Date.now(),
-            miningClaimed: true,
-            miningCyclesToday: cyclesToday + 1,
-            is2xMiningUnlocked: false
-          });
-          logActivity(currentUser.id, currentUser.name, 'MINING_CLAIM', `Claimed ${finalReward} coins`);
         }
         setAdsWatchedToClaim(0);
       }
@@ -174,7 +162,6 @@ const Mining: React.FC = () => {
       {/* Guided Header */}
       <div className="text-center space-y-1 pt-2 relative z-10">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none flex items-center justify-center gap-2">
-           {isVisualPremium && <ZapIcon size={24} className="text-orange-500 fill-current animate-pulse" />}
            Mining
         </h2>
         <div className="flex items-center justify-center gap-1.5">
@@ -199,14 +186,6 @@ const Mining: React.FC = () => {
 
       {/* REACTION CORE - ADVANCED VISUALS */}
       <div className="relative py-4 flex flex-col items-center justify-center">
-         {isVisualPremium && isMiningActive && (
-            <>
-               <ElectricArc color="#fb923c" delay="0s" rotation="rotate-0" />
-               <ElectricArc color="#fde047" delay="0.5s" rotation="rotate-120" />
-               <ElectricArc color="#fbbf24" delay="1s" rotation="rotate-240" />
-            </>
-         )}
-
          <div 
            onClick={handleCoreTap}
            className={`relative w-48 h-48 flex items-center justify-center group cursor-pointer transition-transform ${isMiningActive ? 'active:scale-110' : 'active:scale-95'}`}
@@ -214,31 +193,31 @@ const Mining: React.FC = () => {
             <div className={`absolute inset-0 rounded-full border-2 border-dashed border-blue-500/10 ${isMiningActive ? 'animate-spin-slow' : ''}`} />
             
             <div 
-              className={`relative w-32 h-32 rounded-3xl bg-white dark:bg-gray-900 shadow-xl flex items-center justify-center border-4 border-gray-100 dark:border-gray-800 overflow-hidden transition-all duration-700 ${isMiningActive ? 'shadow-blue-500/20 border-blue-400' : (isMiningComplete ? 'shadow-green-500/20 border-green-500' : '')} ${isVisualPremium && isMiningActive ? 'animate-plasma-glow border-orange-500' : ''}`}
-              style={{ boxShadow: isMiningActive ? `0 0 ${15 + progressPercent/3}px ${isVisualPremium ? 'rgba(249, 115, 22, 0.4)' : 'rgba(59, 130, 246, 0.3)'}` : 'none' }}
+              className={`relative w-32 h-32 rounded-3xl bg-white dark:bg-gray-900 shadow-xl flex items-center justify-center border-4 border-gray-100 dark:border-gray-800 overflow-hidden transition-all duration-700 ${isMiningActive ? 'shadow-blue-500/20 border-blue-400' : (isMiningComplete ? 'shadow-green-500/20 border-green-500' : '')}`}
+              style={{ boxShadow: isMiningActive ? `0 0 ${15 + progressPercent/3}px rgba(59, 130, 246, 0.3)` : 'none' }}
             >
                {/* Plasma Liquid Fill */}
                <div 
-                 className={`absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-out opacity-20 dark:opacity-40 ${isVisualPremium ? 'bg-gradient-to-t from-orange-600 to-yellow-400' : 'bg-gradient-to-t from-blue-600 to-cyan-400'}`}
+                 className={`absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-out opacity-20 dark:opacity-40 bg-gradient-to-t from-blue-600 to-cyan-400`}
                  style={{ height: `${progressPercent}%` }}
                >
                   <div className="absolute top-0 left-0 right-0 h-4 bg-white/20 animate-shimmer-wave blur-sm" />
                </div>
 
                <div className="relative z-10 flex flex-col items-center text-center">
-                  <div className={`w-20 h-20 rounded-[32px] flex items-center justify-center transition-all duration-500 ${isMiningActive ? (isVisualPremium ? 'bg-orange-600 text-white shadow-xl shadow-orange-500/50' : 'bg-blue-600 text-white shadow-lg') : (isMiningComplete ? 'bg-green-500 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-300')}`}>
+                  <div className={`w-20 h-20 rounded-[32px] flex items-center justify-center transition-all duration-500 ${isMiningActive ? 'bg-blue-600 text-white shadow-lg' : (isMiningComplete ? 'bg-green-500 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-300')}`}>
                      {isMiningComplete ? <CheckCircle2 size={40} /> : <Pickaxe size={40} className={isMiningActive ? 'animate-pickaxe' : ''} />}
                   </div>
                   <div className="mt-4">
                      <p className={`text-xs font-black uppercase tracking-tighter ${isMiningComplete ? 'text-green-500' : (isMiningActive ? 'text-blue-500 animate-pulse' : 'text-gray-400')}`}>
-                       {isMiningComplete ? 'Coins Ready' : (isMiningActive ? (isVisualPremium ? '2X HYPERDRIVE' : 'MINING IN PROGRESS') : 'SYSTEM IDLE')}
+                       {isMiningComplete ? 'Coins Ready' : (isMiningActive ? 'MINING IN PROGRESS' : 'SYSTEM IDLE')}
                      </p>
                   </div>
                </div>
 
                {/* Particle Emitter */}
-               {isMiningActive && [...Array(isVisualPremium ? 25 : 12)].map((_, i) => (
-                  <Particle key={i} index={i} isPremium={isVisualPremium} />
+               {isMiningActive && [...Array(12)].map((_, i) => (
+                  <Particle key={i} index={i} />
                ))}
                
                {ripples.map(r => <TapRipple key={r.id} x={r.x} y={r.y} />)}
@@ -260,9 +239,8 @@ const Mining: React.FC = () => {
               </div>
               <ul className="space-y-2 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest list-disc pl-4">
                  <li>Watch <span className="text-blue-600">3 ads</span> to ignite the core.</li>
-                 <li>Cycle time: <span className="text-blue-600">24H</span> (12H for VIP).</li>
-                 <li>Stabilize with <span className="text-blue-600">3 ads</span> to claim coins.</li>
-                 <li className="text-orange-500">VIP Pass: Zero ads + 2x yield.</li>
+                 <li>Cycle time: <span className="text-blue-600">24H</span>.</li>
+                 <li>Stabilize with <span className="text-blue-600">2 ads</span> to claim coins.</li>
               </ul>
            </div>
          )}
@@ -277,7 +255,7 @@ const Mining: React.FC = () => {
             </div>
             <div className="h-4 bg-gray-50 dark:bg-black p-1 rounded-full border border-gray-100 dark:border-gray-800 shadow-inner">
                <div 
-                 className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${isMiningComplete ? 'bg-green-500' : (isVisualPremium ? 'bg-gradient-to-r from-orange-400 to-yellow-500' : 'bg-blue-600')}`} 
+                 className={`h-full rounded-full transition-all duration-1000 relative overflow-hidden ${isMiningComplete ? 'bg-green-500' : 'bg-blue-600'}`} 
                  style={{ width: `${progressPercent}%` }}
                >
                   <div className="absolute inset-0 bg-white/30 animate-shimmer-wave" />
@@ -296,7 +274,7 @@ const Mining: React.FC = () => {
                     <>
                         <Gift size={28} />
                         <span className="uppercase tracking-widest">
-                            {isPass ? "CLAIM COINS" : (adsWatchedToClaim < 2 ? `VERIFY CLAIM ${adsWatchedToClaim + 1}/2` : "CLAIM REWARDS")}
+                            {adsWatchedToClaim < 2 ? `VERIFY CLAIM ${adsWatchedToClaim + 1}/2` : "CLAIM REWARDS"}
                         </span>
                     </>
                 )}
@@ -345,7 +323,7 @@ const Mining: React.FC = () => {
               <button 
                 onClick={handleStartMining}
                 disabled={isProcessing}
-                className={`w-full py-6 rounded-[32px] font-black text-xl shadow-3xl border-b-[8px] transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden ${isVisualPremium ? 'bg-orange-600 border-orange-900 text-white shadow-orange-500/30' : 'bg-blue-600 border-blue-900 text-white shadow-blue-500/30'} active:scale-95 active:border-b-0 active:translate-y-2`}
+                className={`w-full py-6 rounded-[32px] font-black text-xl shadow-3xl border-b-[8px] transition-all flex flex-col items-center justify-center gap-1 group relative overflow-hidden bg-blue-600 border-blue-900 text-white shadow-blue-500/30 active:scale-95 active:border-b-0 active:translate-y-2`}
               >
                 <div className="flex items-center gap-3 relative z-10">
                    {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Pickaxe size={28} className="group-hover:rotate-45 transition-transform" />}

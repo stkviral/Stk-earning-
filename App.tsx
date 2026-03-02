@@ -2,7 +2,7 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { 
   User, UserTag, UserStatus, AppState, Transaction,
-  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL, PassRequest
+  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL
 } from './types';
 import Dashboard from './pages/Dashboard';
 import Mining from './pages/Mining';
@@ -27,7 +27,10 @@ interface AppContextType {
   updateUser: (updates: Partial<User>) => void;
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
-  addCoins: (amount: number, method: string) => boolean;
+  addCoins: (amount: number, method: string, type?: Transaction['type']) => boolean;
+  claimMiningReward: () => boolean;
+  claimSpinReward: (reward: number) => boolean;
+  claimDailyCheckIn: () => boolean;
   playAd: (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
@@ -38,6 +41,7 @@ interface AppContextType {
   checkAdBlocker: () => Promise<boolean>;
   logAdminAction: (action: string, targetId: string, details: string) => void;
   logActivity: (userId: string, userName: string, action: string, details: string) => void;
+  updateDeviceClaim: (deviceId: string, timestamp: number) => void;
   adminActions: {
     approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => void;
     rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => void;
@@ -75,19 +79,18 @@ const DEFAULT_SETTINGS: AppSettings = {
   referralReward: 50,
   miningDurationNormal: 24 * 60 * 60 * 1000,
   miningRewardNormal: 10,
-  miningCyclesPerDayNormal: 1,
-  miningBoostAdsRequired: 20,
-  spinRewards: [1, 2, 3, 5, 20],
+  miningCyclesPerDayNormal: 3,
+  spinRewards: [1, 2, 3, 5, 10],
   maxDailySpinsNormal: 3,
   spinCooldownMinutes: 0,
-  withdrawalFeeNormal: 2,
-  minWithdrawalCoins: 15000,
+  withdrawalFeeNormal: 0,
+  minWithdrawalCoins: 5000,
   withdrawalCooldownHours: 48,
   paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=500&cu=INR",
   adminUpiId: "stk@upi",
   maxDailyAds: 20,
   dailyWithdrawalLimit: 5000,
-  spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "20": 1 },
+  spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "10": 1 },
   emergencyRewardReduction: 0,
   globalRewardMultiplier: 1
 };
@@ -105,6 +108,7 @@ const App: React.FC = () => {
       logs: parsed?.logs || [],
       activityLogs: parsed?.activityLogs || [],
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
+      deviceClaims: parsed?.deviceClaims || {},
       isAdBlockerActive: false,
       isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === parsed?.currentUser?.email),
       theme: parsed?.theme || 'dark'
@@ -196,8 +200,24 @@ const App: React.FC = () => {
 
   const updateLogo = (url: string) => setState(prev => ({ ...prev, logoUrl: url }));
   const updateSettings = (updates: Partial<AppSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...updates } }));
+  const updateDeviceClaim = (deviceId: string, timestamp: number) => setState(prev => ({ ...prev, deviceClaims: { ...prev.deviceClaims, [deviceId]: timestamp } }));
 
-  const addCoins = useCallback((baseAmount: number, method: string): boolean => {
+  const logActivity = useCallback((userId: string, userName: string, action: string, details: string) => {
+    const newLog: ActivityLog = { 
+      id: Math.random().toString(36).substring(2, 9), 
+      userId, 
+      userName, 
+      action, 
+      details, 
+      timestamp: Date.now() 
+    };
+    setState(prev => ({ 
+      ...prev, 
+      activityLogs: [newLog, ...(prev.activityLogs || [])].slice(0, 100) 
+    }));
+  }, []);
+
+  const addCoins = useCallback((baseAmount: number, method: string, type: Transaction['type'] = 'ADJUST'): boolean => {
     if (!state.currentUser) return false;
     if (state.settings.adsEnabled && state.isAdBlockerActive) {
       alert("Reward Blocked: Please disable your ad-blocker to receive coins.");
@@ -227,8 +247,9 @@ const App: React.FC = () => {
 
     const transaction: Transaction = {
       id: Math.random().toString(36).substring(2, 9),
+      userId: state.currentUser.id,
       amount,
-      type: amount >= 0 ? 'EARN' : 'ADJUST',
+      type,
       method,
       status: 'COMPLETED',
       timestamp: Date.now()
@@ -240,6 +261,52 @@ const App: React.FC = () => {
     });
     return true;
   }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
+
+  const claimMiningReward = useCallback((): boolean => {
+    if (!state.currentUser) return false;
+    const reward = state.settings.miningRewardNormal; // Should be 10
+    const success = addCoins(reward, 'Mining Reward', 'MINING');
+    if (success) {
+      updateUser({
+        miningStartedAt: 0,
+        miningLastClaimedAt: Date.now(),
+        miningClaimed: true,
+        miningCyclesToday: (state.currentUser.miningCyclesToday || 0) + 1,
+      });
+      logActivity(state.currentUser.id, state.currentUser.name, 'MINING_CLAIM', `Claimed ${reward} coins`);
+    }
+    return success;
+  }, [state.currentUser, state.settings.miningRewardNormal, addCoins, updateUser, logActivity]);
+
+  const claimSpinReward = useCallback((reward: number): boolean => {
+    if (!state.currentUser) return false;
+    const success = addCoins(reward, 'Spin Reward', 'SPIN');
+    if (success) {
+      updateUser({
+        spinsToday: (state.currentUser.spinsToday || 0) + 1,
+        lastSpinTimestamp: Date.now()
+      });
+      logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${reward} coins`);
+    }
+    return success;
+  }, [state.currentUser, addCoins, updateUser, logActivity]);
+
+  const claimDailyCheckIn = useCallback((): boolean => {
+    if (!state.currentUser) return false;
+    const currentDay = (state.currentUser.streakDays || 0) % 7 + 1;
+    const reward = currentDay === 7 ? 25 : 5;
+    
+    const success = addCoins(reward, 'Daily Check-In', 'CHECKIN');
+    if (success) {
+      updateUser({ 
+        dailyRewardClaimed: true, 
+        streakDays: (state.currentUser.streakDays || 0) + 1
+      });
+      updateDeviceClaim(state.currentUser.deviceId, Date.now());
+      logActivity(state.currentUser.id, state.currentUser.name, 'DAILY_BONUS', `Claimed Day ${currentDay} reward (${reward} coins)`);
+    }
+    return success;
+  }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity]);
 
   const playAd = useCallback((onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
     if (!state.settings.adsEnabled) { onComplete(); return; }
@@ -263,21 +330,6 @@ const App: React.FC = () => {
   const logAdminAction = useCallback((action: string, targetId: string, details: string) => {
     const newLog: AdminLog = { id: Math.random().toString(36).substring(2, 9), adminId: 'SUPER_ADMIN', action, targetId, details, timestamp: Date.now() };
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
-  }, []);
-
-  const logActivity = useCallback((userId: string, userName: string, action: string, details: string) => {
-    const newLog: ActivityLog = { 
-      id: Math.random().toString(36).substring(2, 9), 
-      userId, 
-      userName, 
-      action, 
-      details, 
-      timestamp: Date.now() 
-    };
-    setState(prev => ({ 
-      ...prev, 
-      activityLogs: [newLog, ...(prev.activityLogs || [])].slice(0, 100) 
-    }));
   }, []);
 
   const login = (email: string, name: string, referralCode?: string) => {
@@ -309,8 +361,6 @@ const App: React.FC = () => {
         adsBlocked: false,
         transactions: [],
         referralHistory: [],
-        is2xMiningUnlocked: false,
-        adsFor2xMining: 0,
         deviceId: 'DEV-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
         lastIp: '192.168.1.' + Math.floor(Math.random() * 255),
         riskScore: 0,
@@ -362,7 +412,8 @@ const App: React.FC = () => {
 
     const tx: Transaction = {
       id: 'WD-' + Math.random().toString(36).substring(2, 9),
-      amount: finalAmount, type: 'WITHDRAW', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
+      userId: state.currentUser.id,
+      amount: finalAmount, type: 'WITHDRAWAL', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
     };
     updateUser({ coins: state.currentUser.coins - amount, transactions: [tx, ...state.currentUser.transactions], upiId, lastWithdrawalTimestamp: Date.now() });
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
@@ -412,6 +463,7 @@ const App: React.FC = () => {
           if (u.id !== userId) return u;
           const tx: Transaction = {
             id: 'ADJ-' + Math.random().toString(36).substring(2, 9),
+            userId: u.id,
             amount,
             type: 'ADJUST',
             method: reason,
@@ -529,9 +581,11 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={{
-      state, updateUser, updateLogo, updateSettings, addCoins, playAd, login, logout, 
+      state, updateUser, updateLogo, updateSettings, addCoins, 
+      claimMiningReward, claimSpinReward, claimDailyCheckIn,
+      playAd, login, logout, 
       toggleTheme, withdraw, setActiveTab, calculateRiskScore,
-      checkAdBlocker, logAdminAction, logActivity, adminActions
+      checkAdBlocker, logAdminAction, logActivity, updateDeviceClaim, adminActions
     }}>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-white dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         {state.isLoggedIn && <Header isAdmin={state.isAdminSession} />}

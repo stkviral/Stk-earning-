@@ -10,7 +10,7 @@ import { UserTag } from '../types';
 import { playSound } from '../audioUtils';
 
 const SpinWheel: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, setActiveTab, logActivity } = useApp();
+  const { state, playAd, claimSpinReward, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, settings, isAdBlockerActive } = state;
   const [spinning, setSpinning] = useState(false);
   const [isWobbling, setIsWobbling] = useState(false);
@@ -133,14 +133,9 @@ const SpinWheel: React.FC = () => {
     setIsAdPending(true);
     // MANDATORY AD BEFORE EVERY CLAIM
     playAd(() => {
-      const success = addCoins(lastReward!, 'Lucky Spin');
+      const success = claimSpinReward(lastReward!);
       if (success) {
         playSound('collect');
-        updateUser({ 
-          spinsToday: currentUser.spinsToday + 1,
-          lastSpinTimestamp: Date.now()
-        });
-        logActivity(currentUser.id, currentUser.name, 'SPIN_CLAIM', `Claimed ${lastReward} coins from spin`);
         setLastReward(null);
         setWinningSegmentIndex(null);
       }

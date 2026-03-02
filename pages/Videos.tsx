@@ -68,7 +68,7 @@ const Videos: React.FC = () => {
           Watch & Earn
         </h1>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
-          {settings.adsEnabled ? 'Watch videos to earn free coins' : 'VIP Mode: Instant Rewards Active'}
+          {settings.adsEnabled ? 'Watch videos to earn free coins' : 'Instant Rewards Active'}
         </p>
       </div>
 
@@ -107,7 +107,7 @@ const Videos: React.FC = () => {
         <div className="bg-green-50 dark:bg-green-900/10 p-5 rounded-[32px] border-2 border-green-100 dark:border-green-900/30 flex items-center gap-4 animate-in zoom-in-95">
            <Sparkles className="text-green-600 shrink-0" size={24} />
            <p className="text-[10px] font-black text-green-900 dark:text-green-400 uppercase leading-relaxed tracking-tight">
-             Premium Rewards Mode: Ads are currently disabled. You can claim rewards instantly!
+             Rewards Mode: Ads are currently disabled. You can claim rewards instantly!
            </p>
         </div>
       )}

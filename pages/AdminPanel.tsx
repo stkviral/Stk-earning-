@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { User, UserTag, UserStatus, COIN_TO_INR_RATE, AppSettings } from '../types';
 
-type AdminTab = 'dashboard' | 'users' | 'passes' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
+type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
 
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
   <div className="bg-gray-900 border border-gray-800 p-5 rounded-[32px] space-y-2 shadow-xl">
@@ -357,12 +357,25 @@ const AdminPanel: React.FC = () => {
 
   const analytics = useMemo(() => {
     const u = state.allUsers;
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const dailyCheckins = state.activityLogs.filter(l => l.action === 'DAILY_BONUS' && l.timestamp > todayStart).length;
+    const dailyCoinsIssued = state.activityLogs.filter(l => l.timestamp > todayStart && (l.action === 'MINING_CLAIM' || l.action === 'SPIN_CLAIM' || l.action === 'DAILY_BONUS' || l.action === 'AD_REWARD')).reduce((acc, log) => {
+      const match = log.details.match(/(\d+)/);
+      return acc + (match ? parseInt(match[0]) : 0);
+    }, 0);
+    const miningClaims = state.activityLogs.filter(l => l.action === 'MINING_CLAIM' && l.timestamp > todayStart).length;
+    const spinClaims = state.activityLogs.filter(l => l.action === 'SPIN_CLAIM' && l.timestamp > todayStart).length;
+    
     return {
       totalSTK: u.reduce((a, b) => a + b.coins, 0),
       payouts: u.flatMap(us => us.transactions).filter(t => t.type === 'WITHDRAW' && t.status === 'COMPLETED').reduce((a, b) => a + b.amount, 0),
-      active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length
+      active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length,
+      dailyCheckins,
+      dailyCoinsIssued,
+      miningClaims,
+      spinClaims
     };
-  }, [state.allUsers]);
+  }, [state.allUsers, state.activityLogs]);
 
   return (
     <div className="min-h-full bg-gray-950 text-gray-100 pb-32">
@@ -402,11 +415,12 @@ const AdminPanel: React.FC = () => {
             {activeTab === 'dashboard' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <StatCard label="Supply" value={analytics.totalSTK.toLocaleString()} sub={`₹${(analytics.totalSTK * COIN_TO_INR_RATE).toLocaleString()}`} icon={Coins} color="bg-blue-500/10 text-blue-500" />
-                  <StatCard label="Nodes" value={analytics.active} sub="Active Users" icon={Network} color="bg-indigo-500/10 text-indigo-500" />
-                  <StatCard label="Paid Out" value={`₹${(analytics.payouts * COIN_TO_INR_RATE).toFixed(0)}`} sub="Total verified payouts" icon={Trophy} color="bg-green-500/10 text-green-500" />
-                  <StatCard label="Queue" value={pendingPayouts.length} sub="Pending verification" icon={Clock} color="bg-orange-500/10 text-orange-500" />
-                  <StatCard label="Suspicious" value={state.allUsers.filter(u => calculateRiskScore(u) > 70).length} sub="High risk score" icon={AlertTriangle} color="bg-red-500/10 text-red-500" />
+                  <StatCard label="Daily Coins Issued" value={analytics.dailyCoinsIssued.toLocaleString()} sub={`₹${(analytics.dailyCoinsIssued * COIN_TO_INR_RATE).toLocaleString()}`} icon={Coins} color="bg-blue-500/10 text-blue-500" />
+                  <StatCard label="Active Users" value={analytics.active} sub="Last 1 hour" icon={Network} color="bg-indigo-500/10 text-indigo-500" />
+                  <StatCard label="Mining Claims" value={analytics.miningClaims} sub="Today" icon={Pickaxe} color="bg-green-500/10 text-green-500" />
+                  <StatCard label="Spin Claims" value={analytics.spinClaims} sub="Today" icon={Disc} color="bg-orange-500/10 text-orange-500" />
+                  <StatCard label="Total Liability" value={`₹${(analytics.totalSTK * COIN_TO_INR_RATE).toFixed(0)}`} sub={`${analytics.totalSTK.toLocaleString()} Coins`} icon={AlertTriangle} color="bg-red-500/10 text-red-500" />
+                  <StatCard label="Pending Withdrawals" value={pendingPayouts.length} sub="Requires action" icon={Clock} color="bg-yellow-500/10 text-yellow-500" />
                 </div>
 
                 <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-6 space-y-4">
@@ -529,10 +543,14 @@ const AdminPanel: React.FC = () => {
                         <Pickaxe className="text-indigo-500" size={24} />
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Mining Setup</h3>
                      </div>
-                     <div className="grid grid-cols-1 gap-4">
+                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <label className="text-[9px] font-black text-gray-600 uppercase">Norm Reward</label>
                            <input type="number" value={state.settings.miningRewardNormal ?? 0} onChange={e => updateSettings({ miningRewardNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Daily Limit</label>
+                           <input type="number" value={state.settings.miningCyclesPerDayNormal ?? 0} onChange={e => updateSettings({ miningCyclesPerDayNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
                      </div>
                   </div>
@@ -541,7 +559,7 @@ const AdminPanel: React.FC = () => {
                         <Disc className="text-orange-500" size={24} />
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Spin Setup</h3>
                      </div>
-                     <div className="grid grid-cols-4 gap-2">
+                     <div className="grid grid-cols-5 gap-2">
                         {state.settings.spinRewards.map((val, idx) => (
                           <input key={idx} type="number" value={val ?? 0} onChange={e => {
                              const n = [...state.settings.spinRewards];
@@ -549,6 +567,18 @@ const AdminPanel: React.FC = () => {
                              updateSettings({ spinRewards: n });
                           }} className="bg-gray-950 border border-gray-800 p-3 rounded-xl text-center text-xs font-black text-white" />
                         ))}
+                     </div>
+                     <div className="space-y-2 pt-4 border-t border-gray-800">
+                        <label className="text-[9px] font-black text-gray-600 uppercase">Probabilities (%)</label>
+                        <div className="grid grid-cols-5 gap-2">
+                          {state.settings.spinRewards.map((val, idx) => (
+                            <input key={`prob-${idx}`} type="number" value={state.settings.spinProbabilities[val.toString()] ?? 0} onChange={e => {
+                               const p = { ...state.settings.spinProbabilities };
+                               p[val.toString()] = parseInt(e.target.value) || 0;
+                               updateSettings({ spinProbabilities: p });
+                            }} className="bg-gray-950 border border-gray-800 p-3 rounded-xl text-center text-xs font-black text-white" />
+                          ))}
+                        </div>
                      </div>
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -580,6 +610,11 @@ const AdminPanel: React.FC = () => {
                         <label className="text-[9px] font-black text-red-500 uppercase flex items-center gap-2"><AlertTriangle size={12} /> Emergency Reward Reduction (%)</label>
                         <input type="number" min="0" max="100" value={state.settings.emergencyRewardReduction ?? 0} onChange={e => updateSettings({ emergencyRewardReduction: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-red-900/50 p-4 rounded-2xl text-center text-red-500 font-black focus:border-red-500 outline-none" placeholder="e.g. 50 for half rewards" />
                         <p className="text-[8px] text-gray-500 uppercase font-bold text-center">Instantly reduces all mining and spin rewards by this percentage.</p>
+                     </div>
+                     <div className="space-y-2 pt-4 border-t border-gray-800">
+                        <label className="text-[9px] font-black text-blue-500 uppercase flex items-center gap-2"><TrendingUp size={12} /> Global Reward Multiplier</label>
+                        <input type="number" min="0.1" step="0.1" value={state.settings.globalRewardMultiplier ?? 1} onChange={e => updateSettings({ globalRewardMultiplier: parseFloat(e.target.value) || 1 })} className="w-full bg-gray-950 border border-blue-900/50 p-4 rounded-2xl text-center text-blue-500 font-black focus:border-blue-500 outline-none" placeholder="e.g. 1.5 for 50% more" />
+                        <p className="text-[8px] text-gray-500 uppercase font-bold text-center">Multiplies all rewards (manual control only).</p>
                      </div>
                   </div>
                </div>
@@ -679,12 +714,16 @@ const AdminPanel: React.FC = () => {
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Finance & Logo</h3>
                      </div>
                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                              <label className="text-[9px] font-black text-gray-600 uppercase">Min Withdrawal</label>
                              <input type="number" value={state.settings.minWithdrawalCoins} onChange={e => updateSettings({ minWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
                           </div>
                           <div className="space-y-2">
+                             <label className="text-[9px] font-black text-gray-600 uppercase">Withdraw Fee (%)</label>
+                             <input type="number" value={state.settings.withdrawalFeeNormal} onChange={e => updateSettings({ withdrawalFeeNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
+                          </div>
+                          <div className="space-y-2 col-span-2">
                              <label className="text-[9px] font-black text-gray-600 uppercase">Daily Withdraw Limit</label>
                              <input type="number" value={state.settings.dailyWithdrawalLimit || 5000} onChange={e => updateSettings({ dailyWithdrawalLimit: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
                           </div>
