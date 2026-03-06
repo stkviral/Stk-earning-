@@ -5,7 +5,6 @@ import {
   COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL
 } from './types';
 import Dashboard from './pages/Dashboard';
-import Mining from './pages/Mining';
 import SpinWheel from './pages/SpinWheel';
 import Wallet from './pages/Wallet';
 import Referral from './pages/Referral';
@@ -24,11 +23,12 @@ import { BackendAI } from './geminiService';
 
 interface AppContextType {
   state: AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' };
+  isDeviceLimitReached: boolean;
+  getServerTime: () => number;
   updateUser: (updates: Partial<User>) => void;
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
   addCoins: (amount: number, method: string, type?: Transaction['type']) => boolean;
-  claimMiningReward: () => boolean;
   claimSpinReward: (reward: number) => boolean;
   claimDailyCheckIn: () => boolean;
   playAd: (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => void;
@@ -36,6 +36,7 @@ interface AppContextType {
   logout: () => void;
   toggleTheme: () => void;
   withdraw: (upiId: string, amount: number) => string | null;
+  cancelWithdrawal: (txId: string) => string | null;
   setActiveTab: (tab: string) => void;
   calculateRiskScore: (user: User) => number;
   checkAdBlocker: () => Promise<boolean>;
@@ -48,7 +49,7 @@ interface AppContextType {
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => void;
     setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => void;
     modifyCoins: (userId: string, amount: number, reason: string) => void;
-    resetCooldowns: (userId: string, type: 'MINING' | 'SPIN' | 'ALL', reason: string) => void;
+    resetCooldowns: (userId: string, type: 'SPIN' | 'ALL', reason: string) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
   }
@@ -64,7 +65,6 @@ export const useApp = () => {
 
 const DEFAULT_SETTINGS: AppSettings = {
   maintenanceMode: false,
-  miningEnabled: true,
   spinEnabled: true,
   videosEnabled: true,
   referralsEnabled: true,
@@ -77,9 +77,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   dailyBonusReward: 5,
   adRewardCoins: 1,
   referralReward: 50,
-  miningDurationNormal: 24 * 60 * 60 * 1000,
-  miningRewardNormal: 10,
-  miningCyclesPerDayNormal: 3,
   spinRewards: [1, 2, 3, 5, 10],
   maxDailySpinsNormal: 3,
   spinCooldownMinutes: 0,
@@ -117,6 +114,26 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('home');
   const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onComplete: () => void } | null>(null);
+  const lastRewardTimeRef = React.useRef<number>(0);
+  const timeOffsetRef = React.useRef<number>(0);
+
+  useEffect(() => {
+    const fetchServerTime = async () => {
+      try {
+        const res = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC');
+        const data = await res.json();
+        const serverTime = data.unixtime * 1000;
+        timeOffsetRef.current = serverTime - Date.now();
+      } catch (e) {
+        console.warn('Failed to fetch server time, relying on device time', e);
+      }
+    };
+    fetchServerTime();
+  }, []);
+
+  const getServerTime = useCallback(() => {
+    return Date.now() + timeOffsetRef.current;
+  }, []);
 
   const updateUser = useCallback((updates: Partial<User>) => {
     setState(prev => {
@@ -158,7 +175,7 @@ const App: React.FC = () => {
   // Daily Reset & Pass Expiry Effect
   useEffect(() => {
     if (!state.currentUser) return;
-    const now = Date.now();
+    const now = getServerTime();
     const lastReset = state.currentUser.lastResetTimestamp || 0;
     const dayInMs = 24 * 60 * 60 * 1000;
 
@@ -167,6 +184,10 @@ const App: React.FC = () => {
     // Daily Reset
     if (now - lastReset >= dayInMs) {
       const missedDay = now - lastReset >= dayInMs * 2;
+      let newStreak = state.currentUser.streakDays || 0;
+      if (missedDay || newStreak >= 7) {
+        newStreak = 0;
+      }
       Object.assign(updates, {
         dailyEarned: 0,
         adsWatchedToday: 0,
@@ -174,14 +195,14 @@ const App: React.FC = () => {
         extraSpinWatchedToday: false,
         dailyRewardClaimed: false,
         lastResetTimestamp: now,
-        streakDays: missedDay ? 0 : state.currentUser.streakDays
+        streakDays: newStreak
       });
     }
 
     if (Object.keys(updates).length > 0) {
       updateUser(updates);
     }
-  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp]);
+  }, [state.currentUser?.id, state.currentUser?.lastResetTimestamp, getServerTime]);
 
   useEffect(() => {
     checkAdBlocker();
@@ -262,54 +283,57 @@ const App: React.FC = () => {
     return true;
   }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
 
-  const claimMiningReward = useCallback((): boolean => {
-    if (!state.currentUser) return false;
-    const reward = state.settings.miningRewardNormal; // Should be 10
-    const success = addCoins(reward, 'Mining Reward', 'MINING');
-    if (success) {
-      updateUser({
-        miningStartedAt: 0,
-        miningLastClaimedAt: Date.now(),
-        miningClaimed: true,
-        miningCyclesToday: (state.currentUser.miningCyclesToday || 0) + 1,
-      });
-      logActivity(state.currentUser.id, state.currentUser.name, 'MINING_CLAIM', `Claimed ${reward} coins`);
-    }
-    return success;
-  }, [state.currentUser, state.settings.miningRewardNormal, addCoins, updateUser, logActivity]);
-
   const claimSpinReward = useCallback((reward: number): boolean => {
     if (!state.currentUser) return false;
-    const success = addCoins(reward, 'Spin Reward', 'SPIN');
+    const multiplier = state.currentUser.streakDays >= 7 ? 2.0 : 1.0 + (state.currentUser.streakDays || 0) * 0.1;
+    const finalReward = Math.round(reward * multiplier);
+    
+    const success = addCoins(finalReward, 'Spin Reward', 'SPIN');
     if (success) {
       updateUser({
         spinsToday: (state.currentUser.spinsToday || 0) + 1,
-        lastSpinTimestamp: Date.now()
+        lastSpinTimestamp: getServerTime()
       });
-      logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${reward} coins`);
+      logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
-  }, [state.currentUser, addCoins, updateUser, logActivity]);
+  }, [state.currentUser, addCoins, updateUser, logActivity, getServerTime]);
 
   const claimDailyCheckIn = useCallback((): boolean => {
     if (!state.currentUser) return false;
-    const currentDay = (state.currentUser.streakDays || 0) % 7 + 1;
-    const reward = currentDay === 7 ? 25 : 5;
+    const currentStreak = state.currentUser.streakDays || 0;
+    const currentDay = currentStreak + 1;
+    
+    const baseReward = 5;
+    let reward = baseReward;
+    if (currentDay === 7) {
+      reward += 25; // Extra weekly bonus
+    }
     
     const success = addCoins(reward, 'Daily Check-In', 'CHECKIN');
     if (success) {
       updateUser({ 
         dailyRewardClaimed: true, 
-        streakDays: (state.currentUser.streakDays || 0) + 1
+        streakDays: currentDay
       });
-      updateDeviceClaim(state.currentUser.deviceId, Date.now());
+      updateDeviceClaim(state.currentUser.deviceId, getServerTime());
       logActivity(state.currentUser.id, state.currentUser.name, 'DAILY_BONUS', `Claimed Day ${currentDay} reward (${reward} coins)`);
     }
     return success;
-  }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity]);
+  }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity, getServerTime]);
 
   const playAd = useCallback((onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
-    if (!state.settings.adsEnabled) { onComplete(); return; }
+    const now = Date.now();
+    if (now - lastRewardTimeRef.current < 20000) {
+      alert("Please wait before earning again.");
+      return;
+    }
+    
+    if (!state.settings.adsEnabled) { 
+      lastRewardTimeRef.current = Date.now();
+      onComplete(); 
+      return; 
+    }
     if (state.currentUser?.adsBlocked) { 
       alert("System Restriction: Ad access suspended."); 
       onComplete(); // Call onComplete to unblock UI, but the action might fail inside onComplete
@@ -317,20 +341,35 @@ const App: React.FC = () => {
     }
     if (state.isAdBlockerActive) { 
       alert("Please disable your ad-blocker to watch ads."); 
-      // We don't call onComplete here because we want the user to fix the ad-blocker and try again
-      // But we need a way to reset the 'pending' state in components.
-      // So we'll return a boolean or just call onComplete with a flag.
-      // For now, let's just call onComplete to avoid stuck UI, but components should check isAdBlockerActive.
       onComplete(); 
       return; 
     }
-    setAdConfig({ type, onComplete });
+    
+    // Add random delay between 500ms and 1500ms to prevent instant auto-clicker triggers
+    setTimeout(() => {
+      setAdConfig({ 
+        type, 
+        onComplete: () => {
+          lastRewardTimeRef.current = Date.now();
+          onComplete();
+        } 
+      });
+    }, Math.random() * 1000 + 500);
   }, [state.settings.adsEnabled, state.currentUser?.adsBlocked, state.isAdBlockerActive]);
 
   const logAdminAction = useCallback((action: string, targetId: string, details: string) => {
     const newLog: AdminLog = { id: Math.random().toString(36).substring(2, 9), adminId: 'SUPER_ADMIN', action, targetId, details, timestamp: Date.now() };
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
   }, []);
+
+  const getPersistentDeviceId = () => {
+    let deviceId = localStorage.getItem('stk_device_id');
+    if (!deviceId) {
+      deviceId = 'DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      localStorage.setItem('stk_device_id', deviceId);
+    }
+    return deviceId;
+  };
 
   const login = (email: string, name: string, referralCode?: string) => {
     const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -349,8 +388,6 @@ const App: React.FC = () => {
         lastResetTimestamp: Date.now(),
         adsWatchedToday: 0,
         lastAdTimestamp: 0,
-        miningClaimed: false,
-        miningCyclesToday: 0,
         dailyRewardClaimed: false,
         streakDays: 0,
         spinsToday: 0,
@@ -361,13 +398,23 @@ const App: React.FC = () => {
         adsBlocked: false,
         transactions: [],
         referralHistory: [],
-        deviceId: 'DEV-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+        deviceId: getPersistentDeviceId(),
         lastIp: '192.168.1.' + Math.floor(Math.random() * 255),
         riskScore: 0,
         earningVelocity: 0,
         lastActiveAt: Date.now()
       };
       setState(prev => ({ ...prev, allUsers: [...prev.allUsers, user!] }));
+    } else {
+      // Update existing user's device ID to the persistent one if it's different
+      const persistentId = getPersistentDeviceId();
+      if (user.deviceId !== persistentId) {
+        user.deviceId = persistentId;
+        setState(prev => ({
+          ...prev,
+          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceId: persistentId } : u)
+        }));
+      }
     }
     setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
     setActiveTab(isAdmin ? 'admin' : 'home');
@@ -415,8 +462,49 @@ const App: React.FC = () => {
       userId: state.currentUser.id,
       amount: finalAmount, type: 'WITHDRAWAL', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
     };
-    updateUser({ coins: state.currentUser.coins - amount, transactions: [tx, ...state.currentUser.transactions], upiId, lastWithdrawalTimestamp: Date.now() });
+    
+    const newTransactions = [tx, ...state.currentUser.transactions];
+    updateUser({ coins: state.currentUser.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() });
+    
+    // Also update allUsers
+    setState(prev => ({
+      ...prev,
+      allUsers: prev.allUsers.map(u => u.id === prev.currentUser!.id ? { ...u, coins: u.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() } : u)
+    }));
+    
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
+    return null;
+  };
+
+  const cancelWithdrawal = (txId: string): string | null => {
+    if (!state.currentUser) return "User session error";
+    const txIndex = state.currentUser.transactions.findIndex(t => t.id === txId);
+    if (txIndex === -1) return "Transaction not found";
+    
+    const tx = state.currentUser.transactions[txIndex];
+    if (tx.status !== 'PENDING') return "Only pending withdrawals can be cancelled";
+    
+    const feeMatch = tx.method.match(/Fee: (\d+)/);
+    const feeAmount = feeMatch ? parseInt(feeMatch[1]) : 0;
+    const refundAmount = tx.amount + feeAmount;
+
+    const updatedTx: Transaction = { ...tx, status: 'REJECTED', rejectionReason: 'Cancelled by user' };
+    const newTransactions = [...state.currentUser.transactions];
+    newTransactions[txIndex] = updatedTx;
+
+    updateUser({
+      coins: state.currentUser.coins + refundAmount,
+      transactions: newTransactions,
+      lastWithdrawalTimestamp: 0 // Reset cooldown
+    });
+    
+    // Also update allUsers
+    setState(prev => ({
+      ...prev,
+      allUsers: prev.allUsers.map(u => u.id === prev.currentUser!.id ? { ...u, coins: u.coins + refundAmount, transactions: newTransactions, lastWithdrawalTimestamp: 0 } : u)
+    }));
+
+    logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_CANCEL', `Cancelled withdrawal ${txId} and refunded ${refundAmount} coins`);
     return null;
   };
 
@@ -477,15 +565,11 @@ const App: React.FC = () => {
       });
       logAdminAction('COIN_ADJUST', userId, `Adjusted ${amount} coins. Reason: ${reason}`);
     },
-    resetCooldowns: (userId: string, type: 'MINING' | 'SPIN' | 'ALL', reason: string) => {
+    resetCooldowns: (userId: string, type: 'SPIN' | 'ALL', reason: string) => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
           const updates: Partial<User> = {};
-          if (type === 'MINING' || type === 'ALL') {
-             updates.miningStartedAt = undefined;
-             updates.miningClaimed = false;
-          }
           if (type === 'SPIN' || type === 'ALL') {
              updates.spinsToday = 0;
              updates.lastSpinTimestamp = 0;
@@ -547,7 +631,6 @@ const App: React.FC = () => {
     if (activeTab === 'profile') return <Profile />;
     switch (activeTab) {
       case 'home': return <Dashboard />;
-      case 'mining': return <Mining />;
       case 'spin': return <SpinWheel />;
       case 'wallet': return <Wallet />;
       case 'invite': return <Referral />;
@@ -579,15 +662,17 @@ const App: React.FC = () => {
     return Math.min(100, score);
   }, [state.allUsers, state.settings.dailyCapNormal]);
 
+  const isDeviceLimitReached = state.currentUser ? state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId).length > 3 : false;
+
   return (
     <AppContext.Provider value={{
-      state, updateUser, updateLogo, updateSettings, addCoins, 
-      claimMiningReward, claimSpinReward, claimDailyCheckIn,
+      state, isDeviceLimitReached, updateUser, updateLogo, updateSettings, addCoins, 
+      claimSpinReward, claimDailyCheckIn,
       playAd, login, logout, 
-      toggleTheme, withdraw, setActiveTab, calculateRiskScore,
+      toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, updateDeviceClaim, adminActions
     }}>
-      <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-white dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
+      <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-gray-50 dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         {state.isLoggedIn && <Header isAdmin={state.isAdminSession} />}
         {state.isAdminSession && activeTab !== 'admin' && (
            <div className="bg-orange-600 text-white px-4 py-2 flex items-center justify-between text-[10px] font-black uppercase tracking-widest z-[100]">

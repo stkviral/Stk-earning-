@@ -39,6 +39,7 @@ const Profile: React.FC = () => {
   const menuItems = [
     { id: 'wallet', icon: Wallet, label: 'My Wallet', desc: 'Manage your earnings', color: 'text-blue-500' },
     { id: 'invite', icon: Share2, label: 'Refer & Earn', desc: 'Invite friends for rewards', color: 'text-green-500' },
+    { id: 'faq', icon: Info, label: 'Help & FAQ', desc: 'Get answers to your questions', color: 'text-purple-500' },
     { id: 'discord', icon: HelpCircle, label: 'Support Center', desc: 'Join our Discord server', color: 'text-orange-500' },
   ];
 
@@ -112,20 +113,12 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-50 dark:border-gray-800">
+          <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800">
             <div className="text-center space-y-1">
               <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Daily Streak</p>
               <div className="flex items-center justify-center gap-1.5">
                 <span className="text-lg font-black text-orange-500 italic">{currentUser.streakDays || 0}</span>
                 <span className="text-[10px] font-black text-orange-400 uppercase">Days</span>
-              </div>
-            </div>
-            <div className="text-center space-y-1 border-l border-gray-50 dark:border-gray-800">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Current Rank</p>
-              <div className="flex items-center justify-center gap-1.5">
-                <span className="text-lg font-black text-purple-500 italic">
-                  {(currentUser.streakDays || 0) >= 30 ? 'Diamond' : (currentUser.streakDays || 0) >= 14 ? 'Platinum' : (currentUser.streakDays || 0) >= 7 ? 'Gold' : (currentUser.streakDays || 0) >= 3 ? 'Silver' : 'Bronze'}
-                </span>
               </div>
             </div>
           </div>

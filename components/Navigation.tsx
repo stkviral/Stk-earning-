@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Home, Pickaxe, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare, ShieldCheck, Crown, User, Trophy } from 'lucide-react';
+import { Home, HelpCircle, PlayCircle, UserPlus, Wallet, Briefcase, CheckSquare, ShieldCheck, Crown, User, Trophy } from 'lucide-react';
 import { useApp } from '../App';
 import { ADMIN_EMAIL, UserTag } from '../types';
 
@@ -15,7 +15,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   const tabs = useMemo(() => {
     const baseTabs = [
       { id: 'home', icon: Home, label: 'Home' },
-      { id: 'mining', icon: Pickaxe, label: 'Mining' },
+      { id: 'faq', icon: HelpCircle, label: 'Help' },
       { id: 'wallet', icon: Wallet, label: 'Wallet' },
       { id: 'leaderboard', icon: Trophy, label: 'Ranks' },
       { id: 'profile', icon: User, label: 'Profile' },

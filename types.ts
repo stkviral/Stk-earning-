@@ -25,7 +25,7 @@ export interface Transaction {
   id: string;
   userId: string;
   amount: number;
-  type: 'MINING' | 'SPIN' | 'CHECKIN' | 'WITHDRAWAL' | 'AD' | 'REFERRAL' | 'ADJUST';
+  type: 'SPIN' | 'CHECKIN' | 'WITHDRAWAL' | 'AD' | 'REFERRAL' | 'ADJUST';
   method: string;
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
   timestamp: number;
@@ -64,10 +64,6 @@ export interface User {
   lastResetTimestamp: number;
   adsWatchedToday: number;
   lastAdTimestamp: number;
-  miningClaimed: boolean;
-  miningStartedAt?: number;
-  miningLastClaimedAt?: number;
-  miningCyclesToday: number;
   dailyRewardClaimed: boolean;
   streakDays: number;
   lastCheckInTimestamp: number;
@@ -92,7 +88,6 @@ export interface User {
 
 export interface AppSettings {
   maintenanceMode: boolean;
-  miningEnabled: boolean;
   spinEnabled: boolean;
   videosEnabled: boolean;
   referralsEnabled: boolean;
@@ -105,9 +100,6 @@ export interface AppSettings {
   dailyBonusReward: number;
   adRewardCoins: number;
   referralReward: number;
-  miningDurationNormal: number;
-  miningRewardNormal: number;
-  miningCyclesPerDayNormal: number;
   spinRewards: number[];
   maxDailySpinsNormal: number;
   spinCooldownMinutes: number;

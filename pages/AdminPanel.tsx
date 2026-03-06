@@ -61,7 +61,7 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
     setActionReason('');
   };
 
-  const handleResetCooldown = (type: 'MINING' | 'SPIN' | 'ALL') => {
+  const handleResetCooldown = (type: 'SPIN' | 'ALL') => {
     if (!actionReason) return alert("Reason is required");
     adminActions.resetCooldowns(user.id, type, actionReason);
     setActionReason('');
@@ -141,7 +141,6 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                 <button onClick={() => handleAdjustCoins('REMOVE')} className="bg-red-600 px-4 rounded-xl text-white"><Minus size={18} /></button>
               </div>
               <div className="flex gap-2 pt-2 border-t border-gray-800">
-                <button onClick={() => handleResetCooldown('MINING')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Mining</button>
                 <button onClick={() => handleResetCooldown('SPIN')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Spin</button>
               </div>
             </div>
@@ -244,17 +243,103 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
 const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setViewingUserId }) => {
   const { state, adminActions } = useApp();
   const [filter, setFilter] = useState<'PENDING' | 'COMPLETED' | 'REJECTED'>('PENDING');
+  const [searchTerm, setSearchTerm] = useState('');
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
   const [paymentTxId, setPaymentTxId] = useState<Record<string, string>>({});
 
-  const payouts = useMemo(() => state.allUsers.flatMap(user => 
+  const allWithdrawals = useMemo(() => state.allUsers.flatMap(user => 
     user.transactions
-      .filter(tx => tx.type === 'WITHDRAW' && tx.status === filter)
-      .map(tx => ({ ...tx, userId: user.id, userName: user.name }))
-  ).sort((a, b) => b.timestamp - a.timestamp), [state.allUsers, filter]);
+      .filter(tx => (tx.type === 'WITHDRAW' || tx.type === 'WITHDRAWAL'))
+      .map(tx => ({ ...tx, userId: user.id, userName: user.name, userEmail: user.email }))
+  ), [state.allUsers]);
+
+  const stats = useMemo(() => {
+    const pending = allWithdrawals.filter(tx => tx.status === 'PENDING');
+    const completed = allWithdrawals.filter(tx => tx.status === 'COMPLETED');
+    const rejected = allWithdrawals.filter(tx => tx.status === 'REJECTED');
+    
+    return {
+      pendingCount: pending.length,
+      pendingAmount: pending.reduce((sum, tx) => sum + tx.amount, 0),
+      completedCount: completed.length,
+      completedAmount: completed.reduce((sum, tx) => sum + tx.amount, 0),
+      rejectedCount: rejected.length,
+      rejectedAmount: rejected.reduce((sum, tx) => sum + tx.amount, 0),
+    };
+  }, [allWithdrawals]);
+
+  const payouts = useMemo(() => allWithdrawals
+    .filter(tx => tx.status === filter)
+    .filter(tx => 
+      (tx.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (tx.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a, b) => b.timestamp - a.timestamp), [allWithdrawals, filter, searchTerm]);
 
   return (
     <div className="space-y-6">
+      {/* Withdrawal Dashboard Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-[32px] p-5 flex flex-col items-center justify-center gap-2 shadow-xl">
+          <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+            <Clock size={20} />
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black text-white">{stats.pendingCount}</p>
+            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Pending</p>
+            <p className="text-[10px] font-bold text-yellow-500 mt-1">₹{(stats.pendingAmount * COIN_TO_INR_RATE).toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-[32px] p-5 flex flex-col items-center justify-center gap-2 shadow-xl">
+          <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
+            <CheckCircle2 size={20} />
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black text-white">{stats.completedCount}</p>
+            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Completed</p>
+            <p className="text-[10px] font-bold text-green-500 mt-1">₹{(stats.completedAmount * COIN_TO_INR_RATE).toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-[32px] p-5 flex flex-col items-center justify-center gap-2 shadow-xl">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+            <X size={20} />
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black text-white">{stats.rejectedCount}</p>
+            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Rejected</p>
+            <p className="text-[10px] font-bold text-red-500 mt-1">₹{(stats.rejectedAmount * COIN_TO_INR_RATE).toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-[32px] p-5 flex flex-col items-center justify-center gap-2 shadow-xl">
+          <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+            <Wallet size={20} />
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black text-white">{allWithdrawals.length}</p>
+            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">Total Req</p>
+            <p className="text-[10px] font-bold text-blue-500 mt-1">₹{((stats.pendingAmount + stats.completedAmount + stats.rejectedAmount) * COIN_TO_INR_RATE).toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-600" size={20} />
+        <input 
+          type="text" 
+          placeholder="Search payouts by user name or email..." 
+          value={searchTerm || ''} 
+          onChange={e => setSearchTerm(e.target.value)} 
+          className="w-full bg-gray-900 border-2 border-gray-800 p-5 pl-14 rounded-[32px] text-xs font-black uppercase outline-none focus:border-blue-600 shadow-xl" 
+        />
+        {searchTerm && (
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
       <div className="flex gap-2 bg-gray-900 p-2 rounded-2xl border border-gray-800">
         {(['PENDING', 'COMPLETED', 'REJECTED'] as const).map(f => (
           <button
@@ -359,11 +444,10 @@ const AdminPanel: React.FC = () => {
     const u = state.allUsers;
     const todayStart = new Date().setHours(0, 0, 0, 0);
     const dailyCheckins = state.activityLogs.filter(l => l.action === 'DAILY_BONUS' && l.timestamp > todayStart).length;
-    const dailyCoinsIssued = state.activityLogs.filter(l => l.timestamp > todayStart && (l.action === 'MINING_CLAIM' || l.action === 'SPIN_CLAIM' || l.action === 'DAILY_BONUS' || l.action === 'AD_REWARD')).reduce((acc, log) => {
+    const dailyCoinsIssued = state.activityLogs.filter(l => l.timestamp > todayStart && (l.action === 'SPIN_CLAIM' || l.action === 'DAILY_BONUS' || l.action === 'AD_REWARD')).reduce((acc, log) => {
       const match = log.details.match(/(\d+)/);
       return acc + (match ? parseInt(match[0]) : 0);
     }, 0);
-    const miningClaims = state.activityLogs.filter(l => l.action === 'MINING_CLAIM' && l.timestamp > todayStart).length;
     const spinClaims = state.activityLogs.filter(l => l.action === 'SPIN_CLAIM' && l.timestamp > todayStart).length;
     
     return {
@@ -372,7 +456,6 @@ const AdminPanel: React.FC = () => {
       active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length,
       dailyCheckins,
       dailyCoinsIssued,
-      miningClaims,
       spinClaims
     };
   }, [state.allUsers, state.activityLogs]);
@@ -417,7 +500,6 @@ const AdminPanel: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <StatCard label="Daily Coins Issued" value={analytics.dailyCoinsIssued.toLocaleString()} sub={`₹${(analytics.dailyCoinsIssued * COIN_TO_INR_RATE).toLocaleString()}`} icon={Coins} color="bg-blue-500/10 text-blue-500" />
                   <StatCard label="Active Users" value={analytics.active} sub="Last 1 hour" icon={Network} color="bg-indigo-500/10 text-indigo-500" />
-                  <StatCard label="Mining Claims" value={analytics.miningClaims} sub="Today" icon={Pickaxe} color="bg-green-500/10 text-green-500" />
                   <StatCard label="Spin Claims" value={analytics.spinClaims} sub="Today" icon={Disc} color="bg-orange-500/10 text-orange-500" />
                   <StatCard label="Total Liability" value={`₹${(analytics.totalSTK * COIN_TO_INR_RATE).toFixed(0)}`} sub={`${analytics.totalSTK.toLocaleString()} Coins`} icon={AlertTriangle} color="bg-red-500/10 text-red-500" />
                   <StatCard label="Pending Withdrawals" value={pendingPayouts.length} sub="Requires action" icon={Clock} color="bg-yellow-500/10 text-yellow-500" />
@@ -473,16 +555,16 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="space-y-4">
                   {state.allUsers.filter(u => 
-                    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
                   ).length === 0 ? (
                     <div className="text-center py-12 bg-gray-900 rounded-[40px] border border-gray-800 opacity-50">
                       <p className="text-[10px] font-black uppercase tracking-widest">No users found matching "{searchTerm}"</p>
                     </div>
                   ) : (
                     state.allUsers.filter(u => 
-                      u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                      (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
                     ).map(u => (
                       <div key={u.id} className="bg-gray-900 p-5 rounded-[40px] border border-gray-800 flex flex-col gap-4 shadow-xl transition-all">
                         <div className="flex items-center justify-between cursor-pointer active:scale-95" onClick={() => setViewingUserId(u.id)}>
@@ -540,22 +622,6 @@ const AdminPanel: React.FC = () => {
                <div className="space-y-8">
                   <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-8 space-y-8 shadow-2xl">
                      <div className="flex items-center gap-3">
-                        <Pickaxe className="text-indigo-500" size={24} />
-                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Mining Setup</h3>
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                           <label className="text-[9px] font-black text-gray-600 uppercase">Norm Reward</label>
-                           <input type="number" value={state.settings.miningRewardNormal ?? 0} onChange={e => updateSettings({ miningRewardNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-[9px] font-black text-gray-600 uppercase">Daily Limit</label>
-                           <input type="number" value={state.settings.miningCyclesPerDayNormal ?? 0} onChange={e => updateSettings({ miningCyclesPerDayNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
-                        </div>
-                     </div>
-                  </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-8 space-y-8 shadow-2xl">
-                     <div className="flex items-center gap-3">
                         <Disc className="text-orange-500" size={24} />
                         <h3 className="text-xl font-black uppercase italic tracking-tighter">Spin Setup</h3>
                      </div>
@@ -609,7 +675,7 @@ const AdminPanel: React.FC = () => {
                      <div className="space-y-2 pt-4 border-t border-gray-800">
                         <label className="text-[9px] font-black text-red-500 uppercase flex items-center gap-2"><AlertTriangle size={12} /> Emergency Reward Reduction (%)</label>
                         <input type="number" min="0" max="100" value={state.settings.emergencyRewardReduction ?? 0} onChange={e => updateSettings({ emergencyRewardReduction: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-red-900/50 p-4 rounded-2xl text-center text-red-500 font-black focus:border-red-500 outline-none" placeholder="e.g. 50 for half rewards" />
-                        <p className="text-[8px] text-gray-500 uppercase font-bold text-center">Instantly reduces all mining and spin rewards by this percentage.</p>
+                        <p className="text-[8px] text-gray-500 uppercase font-bold text-center">Instantly reduces all spin rewards by this percentage.</p>
                      </div>
                      <div className="space-y-2 pt-4 border-t border-gray-800">
                         <label className="text-[9px] font-black text-blue-500 uppercase flex items-center gap-2"><TrendingUp size={12} /> Global Reward Multiplier</label>
@@ -653,7 +719,6 @@ const AdminPanel: React.FC = () => {
                      </div>
                      <div className="space-y-4">
                         {[
-                          { key: 'miningEnabled', label: 'Mining Reactor', icon: Pickaxe },
                           { key: 'spinEnabled', label: 'Fortune Wheel', icon: Disc },
                           { key: 'videosEnabled', label: 'Video Rewards', icon: PlayCircle },
                           { key: 'referralsEnabled', label: 'Referral Hub', icon: UserPlus },

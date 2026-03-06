@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { HelpCircle, ChevronDown, Coins, Zap, ShieldCheck, CreditCard, Users, Pickaxe, Disc, FileText, ChevronRight } from 'lucide-react';
+import { HelpCircle, ChevronDown, Coins, Zap, ShieldCheck, CreditCard, Users, Disc, FileText, ChevronRight } from 'lucide-react';
 import { useApp } from '../App';
 import { playSound } from '../audioUtils';
 
@@ -67,18 +67,18 @@ const FAQ: React.FC = () => {
         />
         <FAQItem 
           icon={<Zap size={24} />}
-          question="Daily Earning Limit" 
-          answer="Accounts are limited to 100 Coins daily."
-        />
-        <FAQItem 
-          icon={<Pickaxe size={24} />}
-          question="Mining System" 
-          answer="Mining is a 24-hour cycle. Watch 2 ads to start mining and claim your rewards."
+          question="How to earn coins?" 
+          answer="You can earn coins by watching videos, spinning the lucky wheel, and claiming your daily check-in rewards."
         />
         <FAQItem 
           icon={<Disc size={24} />}
           question="Lucky Spin" 
           answer="Test your luck daily. You get 5 spins per day."
+        />
+        <FAQItem 
+          icon={<HelpCircle size={24} />}
+          question="Daily Check-In" 
+          answer="Log in every day to claim your daily bonus. The reward increases for consecutive days up to a 7-day streak!"
         />
       </div>
 

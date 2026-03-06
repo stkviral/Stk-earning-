@@ -6,11 +6,10 @@ import {
   Star, Zap, Loader2, ShieldCheck, Fingerprint, Activity,
   ShieldOff, ShieldAlert, PlusCircle
 } from 'lucide-react';
-import { UserTag } from '../types';
 import { playSound } from '../audioUtils';
 
 const SpinWheel: React.FC = () => {
-  const { state, playAd, claimSpinReward, updateUser, setActiveTab, logActivity } = useApp();
+  const { state, isDeviceLimitReached, playAd, claimSpinReward, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, settings, isAdBlockerActive } = state;
   const [spinning, setSpinning] = useState(false);
   const [isWobbling, setIsWobbling] = useState(false);
@@ -36,6 +35,9 @@ const SpinWheel: React.FC = () => {
 
   if (!currentUser) return null;
 
+  const multiplier = currentUser.streakDays >= 7 ? 2.0 : 1.0 + (currentUser.streakDays || 0) * 0.1;
+  const finalReward = lastReward !== null ? Math.round(lastReward * multiplier) : null;
+
   if (!settings.spinEnabled) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[500px] text-center space-y-6">
@@ -55,6 +57,10 @@ const SpinWheel: React.FC = () => {
   const remainingSpins = maxSpins - currentUser.spinsToday;
 
   const handleSpin = async () => {
+    if (isDeviceLimitReached) {
+      alert("Maximum accounts reached on this device");
+      return;
+    }
     if (isAdBlockerActive) {
       alert("Verification Failed: Please disable your ad-blocker.");
       return;
@@ -160,10 +166,7 @@ const SpinWheel: React.FC = () => {
   };
 
   return (
-    <div className="p-4 space-y-4 flex flex-col items-center min-h-full pb-28 bg-gray-50 dark:bg-gray-950 transition-colors duration-500 overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-blue-600/10 dark:from-blue-600/20 to-transparent pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.1)_0,transparent_70%)] pointer-events-none" />
-
+    <div className="p-4 space-y-4 flex flex-col items-center min-h-full pb-28 bg-gray-50 dark:bg-gray-950 transition-colors duration-300 overflow-hidden relative">
       <div className="text-center space-y-1.5 pt-4 relative z-10">
         <h2 className={`text-2xl font-black tracking-tighter uppercase italic leading-none transition-colors duration-500 ${isAdBlockerActive ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>Lucky Spin</h2>
         <div className="flex items-center justify-center gap-2">
@@ -279,9 +282,14 @@ const SpinWheel: React.FC = () => {
             <div className="bg-gray-50 dark:bg-black/50 rounded-[32px] py-6 px-4 my-6 border-2 border-gray-100 dark:border-gray-800 shadow-inner flex flex-col items-center justify-center gap-1">
                <div className="flex items-center gap-3">
                   <Coins className="text-yellow-500 animate-pulse" size={32} />
-                  <span className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter tabular-nums italic">{lastReward}</span>
+                  <span className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter tabular-nums italic">{finalReward}</span>
                </div>
                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">COINS WON</span>
+               {multiplier > 1 && (
+                 <span className="text-[10px] font-black text-orange-500 mt-2">
+                   Includes {multiplier.toFixed(1)}x Streak Bonus!
+                 </span>
+               )}
             </div>
 
             <div className="space-y-3">

@@ -5,7 +5,7 @@ import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, A
 import { AD_GAP_MS } from '../types';
 
 const Videos: React.FC = () => {
-  const { state, playAd, addCoins, updateUser, logActivity } = useApp();
+  const { state, isDeviceLimitReached, playAd, addCoins, updateUser, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -24,7 +24,14 @@ const Videos: React.FC = () => {
 
   if (!currentUser) return null;
 
+  const multiplier = currentUser.streakDays >= 7 ? 2.0 : 1.0 + (currentUser.streakDays || 0) * 0.1;
+  const finalReward = Math.round(settings.adRewardCoins * multiplier);
+
   const handleWatchAd = () => {
+    if (isDeviceLimitReached) {
+      alert("Maximum accounts reached on this device");
+      return;
+    }
     if (settings.adsEnabled && isAdBlockerActive) {
       alert("Please disable your ad-blocker to watch reward videos.");
       return;
@@ -42,13 +49,13 @@ const Videos: React.FC = () => {
 
     // playAd will instantly call the callback if settings.adsEnabled is false
     playAd(() => {
-      const success = addCoins(settings.adRewardCoins, 'Video Watch');
+      const success = addCoins(finalReward, 'Video Watch');
       if (success) {
         updateUser({
           adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,
           lastAdTimestamp: Date.now()
         });
-        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${settings.adRewardCoins} coins`);
+        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${finalReward} coins (Base: ${settings.adRewardCoins}, Multiplier: ${multiplier.toFixed(1)}x)`);
       }
     }, 'REWARD');
   };
@@ -58,6 +65,18 @@ const Videos: React.FC = () => {
   return (
     <div className="p-4 space-y-4 animate-in fade-in duration-700 pb-28 max-w-md mx-auto relative overflow-hidden bg-gray-50 dark:bg-gray-950">
       
+      {settings.adsEnabled && isAdBlockerActive && (
+        <div className="bg-red-600 text-white p-4 rounded-2xl shadow-lg border-2 border-red-500 flex items-start gap-3 relative z-20 animate-in slide-in-from-top-4">
+           <AlertTriangle className="text-white shrink-0 mt-0.5" size={24} />
+           <div className="space-y-1">
+             <h3 className="font-black text-sm uppercase tracking-wider">Ad Blocker Detected</h3>
+             <p className="text-xs font-medium text-red-100 leading-relaxed">
+               Please disable your ad blocker to watch videos and earn rewards. Earning is currently suspended.
+             </p>
+           </div>
+        </div>
+      )}
+
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none rounded-full" />
 
       <div className="text-center space-y-1 pt-4 relative z-10">
@@ -93,15 +112,6 @@ const Videos: React.FC = () => {
            </div>
         </div>
       </div>
-
-      {settings.adsEnabled && isAdBlockerActive && (
-        <div className="bg-red-50 dark:bg-red-900/10 p-5 rounded-[32px] border-2 border-red-100 dark:border-red-900/30 flex items-center gap-4 animate-in zoom-in-95">
-           <AlertTriangle className="text-red-600 shrink-0" size={24} />
-           <p className="text-[10px] font-black text-red-900 dark:text-red-400 uppercase leading-relaxed tracking-tight">
-             Earning is disabled because an ad-blocker is active. Turn it off to continue watching videos.
-           </p>
-        </div>
-      )}
 
       {!settings.adsEnabled && (
         <div className="bg-green-50 dark:bg-green-900/10 p-5 rounded-[32px] border-2 border-green-100 dark:border-green-900/30 flex items-center gap-4 animate-in zoom-in-95">
@@ -164,7 +174,7 @@ const Videos: React.FC = () => {
            <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 text-center space-y-0.5">
               <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Reward</p>
               <div className="flex items-center justify-center gap-1">
-                 <span className="text-xs font-black text-gray-900 dark:text-white">{(settings.adRewardCoins).toFixed(2)}</span>
+                 <span className="text-xs font-black text-gray-900 dark:text-white">{finalReward}</span>
                  <Coins size={10} className="text-yellow-500" />
               </div>
            </div>

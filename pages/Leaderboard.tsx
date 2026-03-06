@@ -14,7 +14,7 @@ type LeaderboardFilter = 'DAILY' | 'ALL_TIME';
 
 const ACHIEVEMENTS = [
   { id: 'first_blood', title: 'First Blood', desc: 'Earn your first STK Coin.', icon: Flame, color: 'text-red-500', bg: 'bg-red-500/10', requirement: 1, type: 'coins' },
-  { id: 'miner_novice', title: 'Novice Miner', desc: 'Claim 5 mining rewards.', icon: Pickaxe, color: 'text-blue-500', bg: 'bg-blue-500/10', requirement: 5, type: 'mining' },
+  { id: 'daily_streaker', title: 'Daily Streaker', desc: 'Claim 5 daily check-ins.', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10', requirement: 5, type: 'checkin' },
   { id: 'spinner_lucky', title: 'Lucky Spinner', desc: 'Spin the wheel 10 times.', icon: Disc, color: 'text-orange-500', bg: 'bg-orange-500/10', requirement: 10, type: 'spin' },
   { id: 'ad_watcher', title: 'Ad Watcher', desc: 'Watch 20 video ads.', icon: PlayCircle, color: 'text-purple-500', bg: 'bg-purple-500/10', requirement: 20, type: 'video' },
   { id: 'wealthy', title: 'Wealthy', desc: 'Accumulate 10,000 STK Coins.', icon: Crown, color: 'text-yellow-500', bg: 'bg-yellow-500/10', requirement: 10000, type: 'coins' },
@@ -39,21 +39,21 @@ const Leaderboard: React.FC = () => {
     if (!currentUser) return {};
     
     let totalCoins = currentUser.coins; // We could sum EARN transactions, but current balance is fine for 'wealthy'
-    let miningCount = 0;
+    let checkinCount = 0;
     let spinCount = 0;
     let videoCount = 0;
 
     currentUser.transactions.forEach(tx => {
-      if (tx.type === 'EARN') {
-        if (tx.method === 'Mining Reward') miningCount++;
-        if (tx.method === 'Lucky Spin') spinCount++;
-        if (tx.method === 'Video Watch') videoCount++;
+      if (tx.type === 'EARN' || tx.type === 'CHECKIN' || tx.type === 'SPIN' || tx.type === 'AD') {
+        if (tx.method === 'Daily Check-In') checkinCount++;
+        if (tx.method === 'Lucky Spin' || tx.type === 'SPIN') spinCount++;
+        if (tx.method === 'Video Watch' || tx.type === 'AD') videoCount++;
       }
     });
 
     return {
       coins: totalCoins,
-      mining: miningCount,
+      checkin: checkinCount,
       spin: spinCount,
       video: videoCount
     };
