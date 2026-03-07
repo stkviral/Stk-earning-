@@ -13,7 +13,7 @@ import {
 import { playSound } from '../audioUtils';
 
 const Dashboard: React.FC = () => {
-  const { state, isDeviceLimitReached, playAd, claimDailyCheckIn, setActiveTab, logActivity, updateDeviceClaim } = useApp();
+  const { state, isDeviceLimitReached, getServerTime, playAd, claimDailyCheckIn, setActiveTab, logActivity, updateDeviceClaim } = useApp();
   const { currentUser, settings } = state;
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [showNotification, setShowNotification] = useState(true);
@@ -28,8 +28,8 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.dailyRewardClaimed) return;
     const timer = setInterval(() => {
-      const now = Date.now();
-      const nextReset = (currentUser.lastResetTimestamp || Date.now()) + (24 * 60 * 60 * 1000);
+      const now = getServerTime();
+      const nextReset = (currentUser.lastResetTimestamp || getServerTime()) + (24 * 60 * 60 * 1000);
       const diff = nextReset - now;
       if (diff <= 0) {
         setTimeLeft('Ready!');
@@ -42,7 +42,7 @@ const Dashboard: React.FC = () => {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [currentUser?.dailyRewardClaimed, currentUser?.lastResetTimestamp]);
+  }, [currentUser?.dailyRewardClaimed, currentUser?.lastResetTimestamp, getServerTime]);
 
   if (!currentUser) return null;
 
@@ -61,7 +61,7 @@ const Dashboard: React.FC = () => {
   const hasActivity = currentUser.spinsToday > 0;
   
   const lastDeviceClaim = state.deviceClaims[currentUser.deviceId] || 0;
-  const isDeviceClaimedToday = Date.now() - lastDeviceClaim < 24 * 60 * 60 * 1000;
+  const isDeviceClaimedToday = getServerTime() - lastDeviceClaim < 24 * 60 * 60 * 1000;
   
   const canClaim = hasWatchedAd && hasActivity && !isDeviceClaimedToday && !isDeviceLimitReached;
 

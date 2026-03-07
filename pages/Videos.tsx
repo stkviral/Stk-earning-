@@ -5,7 +5,7 @@ import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, A
 import { AD_GAP_MS } from '../types';
 
 const Videos: React.FC = () => {
-  const { state, isDeviceLimitReached, playAd, addCoins, updateUser, logActivity } = useApp();
+  const { state, isDeviceLimitReached, getServerTime, playAd, addCoins, updateUser, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -14,13 +14,13 @@ const Videos: React.FC = () => {
     
     // Manage interval for reward video cooldown
     const interval = setInterval(() => {
-      const now = Date.now();
+      const now = getServerTime();
       const diff = AD_GAP_MS - (now - currentUser.lastAdTimestamp);
       setTimeLeft(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastAdTimestamp]);
+  }, [currentUser?.lastAdTimestamp, getServerTime]);
 
   if (!currentUser) return null;
 
@@ -53,7 +53,7 @@ const Videos: React.FC = () => {
       if (success) {
         updateUser({
           adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,
-          lastAdTimestamp: Date.now()
+          lastAdTimestamp: getServerTime()
         });
         logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${finalReward} coins (Base: ${settings.adRewardCoins}, Multiplier: ${multiplier.toFixed(1)}x)`);
       }

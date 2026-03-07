@@ -323,14 +323,14 @@ const App: React.FC = () => {
   }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity, getServerTime]);
 
   const playAd = useCallback((onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
-    const now = Date.now();
+    const now = getServerTime();
     if (now - lastRewardTimeRef.current < 20000) {
       alert("Please wait before earning again.");
       return;
     }
     
     if (!state.settings.adsEnabled) { 
-      lastRewardTimeRef.current = Date.now();
+      lastRewardTimeRef.current = getServerTime();
       onComplete(); 
       return; 
     }
@@ -350,12 +350,12 @@ const App: React.FC = () => {
       setAdConfig({ 
         type, 
         onComplete: () => {
-          lastRewardTimeRef.current = Date.now();
+          lastRewardTimeRef.current = getServerTime();
           onComplete();
         } 
       });
     }, Math.random() * 1000 + 500);
-  }, [state.settings.adsEnabled, state.currentUser?.adsBlocked, state.isAdBlockerActive]);
+  }, [state.settings.adsEnabled, state.currentUser?.adsBlocked, state.isAdBlockerActive, getServerTime]);
 
   const logAdminAction = useCallback((action: string, targetId: string, details: string) => {
     const newLog: AdminLog = { id: Math.random().toString(36).substring(2, 9), adminId: 'SUPER_ADMIN', action, targetId, details, timestamp: Date.now() };
@@ -666,7 +666,7 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={{
-      state, isDeviceLimitReached, updateUser, updateLogo, updateSettings, addCoins, 
+      state, isDeviceLimitReached, getServerTime, updateUser, updateLogo, updateSettings, addCoins, 
       claimSpinReward, claimDailyCheckIn,
       playAd, login, logout, 
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,

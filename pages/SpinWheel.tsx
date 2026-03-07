@@ -9,7 +9,7 @@ import {
 import { playSound } from '../audioUtils';
 
 const SpinWheel: React.FC = () => {
-  const { state, isDeviceLimitReached, playAd, claimSpinReward, updateUser, setActiveTab, logActivity } = useApp();
+  const { state, isDeviceLimitReached, getServerTime, playAd, claimSpinReward, updateUser, setActiveTab, logActivity } = useApp();
   const { currentUser, settings, isAdBlockerActive } = state;
   const [spinning, setSpinning] = useState(false);
   const [isWobbling, setIsWobbling] = useState(false);
@@ -24,14 +24,14 @@ const SpinWheel: React.FC = () => {
     if (!currentUser || !settings.spinCooldownMinutes) return;
     
     const interval = setInterval(() => {
-      const now = Date.now();
+      const now = getServerTime();
       const cooldownMs = settings.spinCooldownMinutes * 60 * 1000;
       const diff = cooldownMs - (now - (currentUser.lastSpinTimestamp || 0));
       setCooldownTime(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastSpinTimestamp, settings.spinCooldownMinutes]);
+  }, [currentUser?.lastSpinTimestamp, settings.spinCooldownMinutes, getServerTime]);
 
   if (!currentUser) return null;
 
@@ -110,7 +110,8 @@ const SpinWheel: React.FC = () => {
       const segmentAngle = 360 / settings.spinRewards.length;
       const extraRotations = 10 * 360; 
       const currentAngleOffset = rotation % 360;
-      const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2);
+      const randomOffset = (Math.random() * 0.8 - 0.4) * segmentAngle; // +/- 40% of segment
+      const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2) + randomOffset;
       const newRotation = rotation + extraRotations + (finalSegmentAngle - currentAngleOffset);
       
       setRotation(newRotation);
@@ -190,7 +191,7 @@ const SpinWheel: React.FC = () => {
           ))}
         </div>
         
-        <div ref={wheelRef} className={`absolute inset-4 rounded-full border-2 border-white/20 shadow-xl overflow-hidden transition-all duration-[4000ms] ease-[cubic-bezier(0.2,0,0.1,1)] ${isAdBlockerActive ? 'grayscale opacity-20' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
+        <div ref={wheelRef} className={`absolute inset-4 rounded-full border-2 border-white/20 shadow-xl overflow-hidden ${isAdBlockerActive ? 'grayscale opacity-20' : ''}`} style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 4000ms cubic-bezier(0.2, 0, 0.1, 1)' }}>
           {settings.spinRewards.map((val, i) => {
             const angle = 360 / settings.spinRewards.length;
             const darkVibrantColors = ['#dc2626', '#d97706', '#059669', '#2563eb', '#4f46e5', '#7c3aed', '#c026d3', '#db2777'];
@@ -200,9 +201,11 @@ const SpinWheel: React.FC = () => {
                   <svg className="absolute w-full h-full" viewBox="0 0 100 100">
                     <path d={`M50,50 L50,0 A50,50 0 0,1 ${50 + 50 * Math.sin(angle * Math.PI / 180)},${50 - 50 * Math.cos(angle * Math.PI / 180)} Z`} fill={darkVibrantColors[i % darkVibrantColors.length]} />
                   </svg>
-                  <div className={`absolute top-4 left-1/2 -translate-x-1/2 font-black text-white text-base flex flex-col items-center drop-shadow-lg transition-transform ${winningSegmentIndex === i ? 'scale-150' : ''}`} style={{ transform: `rotate(${angle / 2}deg)` }}>
-                    <span>{val}</span>
-                    <Coins size={10} className="opacity-80 mt-0.5" />
+                  <div className="absolute inset-0" style={{ transform: `rotate(${angle / 2}deg)` }}>
+                    <div className={`absolute top-4 left-1/2 -translate-x-1/2 font-black text-white text-base flex flex-col items-center drop-shadow-lg transition-transform ${winningSegmentIndex === i ? 'scale-150' : ''}`}>
+                      <span>{val}</span>
+                      <Coins size={10} className="opacity-80 mt-0.5" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -233,8 +236,13 @@ const SpinWheel: React.FC = () => {
               <p className="text-xs font-black text-gray-900 dark:text-white uppercase italic">Standard Yield</p>
             </div>
           </div>
-          <div className="px-3 py-1.5 rounded-xl text-[9px] font-black shadow-md transition-all bg-blue-600 text-white">
-             {remainingSpins} LEFT
+          <div className="flex flex-col items-end gap-1">
+            <div className="px-3 py-1.5 rounded-xl text-[9px] font-black shadow-md transition-all bg-blue-600 text-white">
+               {remainingSpins} LEFT
+            </div>
+            <div className="text-[9px] font-black text-orange-500 uppercase tracking-widest">
+               {multiplier.toFixed(1)}x Multiplier
+            </div>
           </div>
         </div>
 
@@ -256,9 +264,9 @@ const SpinWheel: React.FC = () => {
              <button 
                onClick={handleUnlockExtraSpin}
                disabled={isAdPending || isAdBlockerActive}
-               className="w-full py-3 bg-white dark:bg-gray-900 border-2 border-blue-100 dark:border-blue-900 rounded-2xl text-blue-600 dark:text-blue-400 font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
+               className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 border-2 border-orange-600 rounded-2xl text-white font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md"
              >
-                <PlusCircle size={16} /> Restore Energy
+                <PlusCircle size={16} /> Watch Ad for Extra Spin
              </button>
           )}
         </div>
