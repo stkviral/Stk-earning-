@@ -49,22 +49,56 @@ const FAQ: React.FC = () => {
     <div className="p-6 space-y-10 pb-40 animate-in fade-in duration-700 bg-gray-50 dark:bg-gray-950 min-h-full">
       <div className="text-center space-y-4 pt-4">
         <div className="inline-flex items-center gap-3 bg-blue-600 dark:bg-blue-900 text-white px-6 py-2 rounded-full font-black text-[10px] uppercase tracking-[0.3em] shadow-xl shadow-blue-500/10 border border-white/10">
-          <HelpCircle size={14} className="animate-pulse" /> Help Center
+          <HelpCircle size={14} className="animate-pulse" /> Help & Support
         </div>
-        <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Frequently Asked Questions</h2>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">Learn how to earn and withdraw your coins.</p>
+        <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Help Center</h2>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">Everything you need to know.</p>
       </div>
 
       <div className="space-y-5">
         <div className="flex items-center gap-3 px-2">
-           <Coins size={14} className="text-blue-500" />
-           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">Earnings & Balance</h3>
+           <HelpCircle size={14} className="text-blue-500" />
+           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">FAQ</h3>
         </div>
         <FAQItem 
           icon={<Coins size={24} />}
           question="How much are coins worth?" 
           answer="The math is simple: 100 Coins = ₹10. Your balance is updated in real-time."
         />
+        <FAQItem 
+          icon={<Users size={24} />}
+          question="Referral Rewards" 
+          answer="Invite your friends and earn! Get 50 Coins instantly when your friend makes their first withdrawal."
+        />
+      </div>
+
+      <div className="space-y-5">
+        <div className="flex items-center gap-3 px-2">
+           <CreditCard size={14} className="text-indigo-500" />
+           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">Withdrawal Help</h3>
+        </div>
+        <FAQItem 
+          icon={<CreditCard size={24} />}
+          question="Minimum Withdrawal" 
+          answer="You can withdraw once you reach 500 Coins (₹50). Payments are sent directly to your UPI ID."
+        />
+        <FAQItem 
+          icon={<ShieldCheck size={24} />}
+          question="Withdrawal Fees" 
+          answer="Withdrawals may have a small processing fee depending on network conditions."
+        />
+        <FAQItem 
+          icon={<Zap size={24} />}
+          question="Processing Time" 
+          answer="Withdrawals are usually processed within 24-48 hours. You can check the status in your Wallet."
+        />
+      </div>
+
+      <div className="space-y-5">
+        <div className="flex items-center gap-3 px-2">
+           <Disc size={14} className="text-purple-500" />
+           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">App Usage Guide</h3>
+        </div>
         <FAQItem 
           icon={<Zap size={24} />}
           question="How to earn coins?" 
@@ -79,28 +113,6 @@ const FAQ: React.FC = () => {
           icon={<HelpCircle size={24} />}
           question="Daily Check-In" 
           answer="Log in every day to claim your daily bonus. The reward increases for consecutive days up to a 7-day streak!"
-        />
-      </div>
-
-      <div className="space-y-5">
-        <div className="flex items-center gap-3 px-2">
-           <CreditCard size={14} className="text-indigo-500" />
-           <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">Withdrawal Rules</h3>
-        </div>
-        <FAQItem 
-          icon={<CreditCard size={24} />}
-          question="Minimum Withdrawal" 
-          answer="You can withdraw once you reach 500 Coins (₹50). Payments are sent directly to your UPI ID."
-        />
-        <FAQItem 
-          icon={<ShieldCheck size={24} />}
-          question="Withdrawal Fees" 
-          answer="Withdrawals may have a small processing fee depending on network conditions."
-        />
-        <FAQItem 
-          icon={<Users size={24} />}
-          question="Referral Rewards" 
-          answer="Invite your friends and earn! Get 50 Coins instantly when your friend makes their first withdrawal."
         />
       </div>
 

@@ -82,6 +82,12 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
               <ShieldCheck size={20} />
             </button>
           )}
+          <button 
+            onClick={() => { playSound('tap'); toggleTheme(); }}
+            className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-90 text-gray-600 dark:text-gray-300"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
         </div>
       </div>
     </header>

@@ -15,6 +15,7 @@ import FAQ from './pages/FAQ';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
 import Leaderboard from './pages/Leaderboard';
+import ScratchCard from './pages/ScratchCard';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
@@ -30,8 +31,9 @@ interface AppContextType {
   updateSettings: (updates: Partial<AppSettings>) => void;
   addCoins: (amount: number, method: string, type?: Transaction['type']) => boolean;
   claimSpinReward: (reward: number) => boolean;
+  claimScratchReward: (reward: number) => boolean;
   claimDailyCheckIn: () => boolean;
-  playAd: (onComplete: () => void, type: 'REWARD' | 'REQUIRED') => void;
+  playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void) => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
@@ -66,6 +68,7 @@ export const useApp = () => {
 const DEFAULT_SETTINGS: AppSettings = {
   maintenanceMode: false,
   spinEnabled: true,
+  scratchEnabled: true,
   videosEnabled: true,
   referralsEnabled: true,
   adsEnabled: true,
@@ -80,11 +83,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   spinRewards: [1, 2, 3, 5, 10],
   maxDailySpinsNormal: 3,
   spinCooldownMinutes: 0,
+  scratchRewards: [2, 4, 6, 8, 15],
+  maxDailyScratchesNormal: 3,
+  scratchCooldownMinutes: 0,
+  scratchProbabilities: { "2": 40, "4": 30, "6": 20, "8": 9, "15": 1 },
   withdrawalFeeNormal: 0,
   minWithdrawalCoins: 5000,
   withdrawalCooldownHours: 48,
-  paymentQrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=stk@upi&pn=STK%20Earning&am=500&cu=INR",
-  adminUpiId: "stk@upi",
   maxDailyAds: 20,
   dailyWithdrawalLimit: 5000,
   spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "10": 1 },
@@ -193,6 +198,8 @@ const App: React.FC = () => {
         adsWatchedToday: 0,
         spinsToday: 0,
         extraSpinWatchedToday: false,
+        scratchesToday: 0,
+        extraScratchWatchedToday: false,
         dailyRewardClaimed: false,
         lastResetTimestamp: now,
         streakDays: newStreak
@@ -240,6 +247,10 @@ const App: React.FC = () => {
 
   const addCoins = useCallback((baseAmount: number, method: string, type: Transaction['type'] = 'ADJUST'): boolean => {
     if (!state.currentUser) return false;
+    if (state.currentUser.status === UserStatus.SUSPENDED) {
+      alert(`Account Suspended: ${state.currentUser.statusReason || 'Violation of terms'}`);
+      return false;
+    }
     if (state.settings.adsEnabled && state.isAdBlockerActive) {
       alert("Reward Blocked: Please disable your ad-blocker to receive coins.");
       return false;
@@ -299,6 +310,22 @@ const App: React.FC = () => {
     return success;
   }, [state.currentUser, addCoins, updateUser, logActivity, getServerTime]);
 
+  const claimScratchReward = useCallback((reward: number): boolean => {
+    if (!state.currentUser) return false;
+    const multiplier = state.currentUser.streakDays >= 7 ? 2.0 : 1.0 + (state.currentUser.streakDays || 0) * 0.1;
+    const finalReward = Math.round(reward * multiplier);
+    
+    const success = addCoins(finalReward, 'Scratch Reward', 'SPIN'); // Using SPIN type for now
+    if (success) {
+      updateUser({
+        scratchesToday: (state.currentUser.scratchesToday || 0) + 1,
+        lastScratchTimestamp: getServerTime()
+      });
+      logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
+    }
+    return success;
+  }, [state.currentUser, addCoins, updateUser, logActivity, getServerTime]);
+
   const claimDailyCheckIn = useCallback((): boolean => {
     if (!state.currentUser) return false;
     const currentStreak = state.currentUser.streakDays || 0;
@@ -322,26 +349,34 @@ const App: React.FC = () => {
     return success;
   }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity, getServerTime]);
 
-  const playAd = useCallback((onComplete: () => void, type: 'REWARD' | 'REQUIRED') => {
+  const playAd = useCallback((onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void) => {
+    if (state.currentUser?.status === UserStatus.SUSPENDED) {
+      alert(`Account Suspended: ${state.currentUser?.statusReason || 'Violation of terms'}`);
+      if (onClose) onClose();
+      return;
+    }
     const now = getServerTime();
     if (now - lastRewardTimeRef.current < 20000) {
       alert("Please wait before earning again.");
+      if (onClose) onClose();
       return;
     }
     
     if (!state.settings.adsEnabled) { 
       lastRewardTimeRef.current = getServerTime();
-      onComplete(); 
+      onReward(); 
+      if (onClose) onClose();
       return; 
     }
     if (state.currentUser?.adsBlocked) { 
       alert("System Restriction: Ad access suspended."); 
-      onComplete(); // Call onComplete to unblock UI, but the action might fail inside onComplete
+      onReward(); // Call onReward to unblock UI, but the action might fail inside onReward
+      if (onClose) onClose();
       return; 
     }
     if (state.isAdBlockerActive) { 
       alert("Please disable your ad-blocker to watch ads."); 
-      onComplete(); 
+      if (onClose) onClose();
       return; 
     }
     
@@ -349,10 +384,14 @@ const App: React.FC = () => {
     setTimeout(() => {
       setAdConfig({ 
         type, 
-        onComplete: () => {
+        onReward: () => {
           lastRewardTimeRef.current = getServerTime();
-          onComplete();
-        } 
+          onReward();
+        },
+        onClose: () => {
+          if (onClose) onClose();
+          setAdConfig(null);
+        }
       });
     }, Math.random() * 1000 + 500);
   }, [state.settings.adsEnabled, state.currentUser?.adsBlocked, state.isAdBlockerActive, getServerTime]);
@@ -393,6 +432,9 @@ const App: React.FC = () => {
         spinsToday: 0,
         lastSpinTimestamp: 0,
         extraSpinWatchedToday: false,
+        scratchesToday: 0,
+        lastScratchTimestamp: 0,
+        extraScratchWatchedToday: false,
         status: UserStatus.ACTIVE,
         walletFrozen: false,
         adsBlocked: false,
@@ -443,6 +485,7 @@ const App: React.FC = () => {
 
   const withdraw = (upiId: string, amount: number): string | null => {
     if (!state.currentUser) return "User session error";
+    if (state.currentUser.status === UserStatus.SUSPENDED) return `Account Suspended: ${state.currentUser.statusReason || 'Violation of terms'}`;
     if (!state.settings.withdrawalsEnabled) return "Withdrawals are temporarily disabled by the administrator.";
     if (state.currentUser.walletFrozen) return "Your wallet is frozen.";
     if (state.currentUser.coins < amount) return "Insufficient balance";
@@ -565,7 +608,7 @@ const App: React.FC = () => {
       });
       logAdminAction('COIN_ADJUST', userId, `Adjusted ${amount} coins. Reason: ${reason}`);
     },
-    resetCooldowns: (userId: string, type: 'SPIN' | 'ALL', reason: string) => {
+    resetCooldowns: (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
@@ -573,6 +616,10 @@ const App: React.FC = () => {
           if (type === 'SPIN' || type === 'ALL') {
              updates.spinsToday = 0;
              updates.lastSpinTimestamp = 0;
+          }
+          if (type === 'SCRATCH' || type === 'ALL') {
+             updates.scratchesToday = 0;
+             updates.lastScratchTimestamp = 0;
           }
           return { ...u, ...updates };
         });
@@ -632,6 +679,7 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'home': return <Dashboard />;
       case 'spin': return <SpinWheel />;
+      case 'scratch': return <ScratchCard />;
       case 'wallet': return <Wallet />;
       case 'invite': return <Referral />;
       case 'videos': return <Videos />;
@@ -667,7 +715,7 @@ const App: React.FC = () => {
   return (
     <AppContext.Provider value={{
       state, isDeviceLimitReached, getServerTime, updateUser, updateLogo, updateSettings, addCoins, 
-      claimSpinReward, claimDailyCheckIn,
+      claimSpinReward, claimScratchReward, claimDailyCheckIn,
       playAd, login, logout, 
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, updateDeviceClaim, adminActions
@@ -694,7 +742,7 @@ const App: React.FC = () => {
         {state.isLoggedIn && activeTab !== 'admin' && activeTab !== 'privacy' && !state.settings.maintenanceMode && (
           <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
-        {adConfig && <AdOverlay type={adConfig.type} onClose={() => { adConfig.onComplete(); setAdConfig(null); }} />}
+        {adConfig && <AdOverlay type={adConfig.type} onReward={adConfig.onReward} onClose={adConfig.onClose} />}
       </div>
     </AppContext.Provider>
   );

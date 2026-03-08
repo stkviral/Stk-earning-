@@ -57,7 +57,7 @@ const Videos: React.FC = () => {
         });
         logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${finalReward} coins (Base: ${settings.adRewardCoins}, Multiplier: ${multiplier.toFixed(1)}x)`);
       }
-    }, 'REWARD');
+    }, 'REWARD', () => {});
   };
 
   const progress = (currentUser.adsWatchedToday / settings.maxDailyAds) * 100;
@@ -129,9 +129,14 @@ const Videos: React.FC = () => {
                  <Flame size={14} className="text-orange-500" />
                  <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Daily Progress</span>
               </div>
-              <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-800">
-                {currentUser.adsWatchedToday} / {settings.maxDailyAds}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-orange-500 uppercase bg-orange-50 dark:bg-orange-900/40 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-800">
+                  {multiplier.toFixed(1)}x Multiplier
+                </span>
+                <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-800">
+                  {currentUser.adsWatchedToday} / {settings.maxDailyAds}
+                </span>
+              </div>
            </div>
            <div className="h-4 bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden p-1 border border-gray-100 dark:border-gray-700 shadow-inner">
               <div 

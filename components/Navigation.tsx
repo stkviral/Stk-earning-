@@ -15,7 +15,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   const tabs = useMemo(() => {
     const baseTabs = [
       { id: 'home', icon: Home, label: 'Home' },
-      { id: 'faq', icon: HelpCircle, label: 'Help' },
       { id: 'wallet', icon: Wallet, label: 'Wallet' },
       { id: 'leaderboard', icon: Trophy, label: 'Ranks' },
       { id: 'profile', icon: User, label: 'Profile' },

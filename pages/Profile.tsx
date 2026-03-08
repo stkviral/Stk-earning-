@@ -39,8 +39,8 @@ const Profile: React.FC = () => {
   const menuItems = [
     { id: 'wallet', icon: Wallet, label: 'My Wallet', desc: 'Manage your earnings', color: 'text-blue-500' },
     { id: 'invite', icon: Share2, label: 'Refer & Earn', desc: 'Invite friends for rewards', color: 'text-green-500' },
-    { id: 'faq', icon: Info, label: 'Help & FAQ', desc: 'Get answers to your questions', color: 'text-purple-500' },
-    { id: 'discord', icon: HelpCircle, label: 'Support Center', desc: 'Join our Discord server', color: 'text-orange-500' },
+    { id: 'faq', icon: Info, label: 'Help & Support', desc: 'FAQ, Withdrawal & App Guide', color: 'text-purple-500' },
+    { id: 'discord', icon: HelpCircle, label: 'Contact Support', desc: 'Join our Discord server', color: 'text-orange-500' },
   ];
 
   const handleLogout = () => {

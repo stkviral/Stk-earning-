@@ -149,8 +149,8 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Primary Action Hub (3 Circular Icons) */}
-      <div className="grid grid-cols-3 gap-2 relative z-10 mt-8">
+      {/* 2. Primary Action Hub (4 Circular Icons) */}
+      <div className="grid grid-cols-4 gap-2 relative z-10 mt-8">
 
         {/* SPIN */}
         <div 
@@ -164,6 +164,17 @@ const Dashboard: React.FC = () => {
           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Spin</span>
         </div>
 
+        {/* SCRATCH */}
+        <div 
+          onClick={() => { playSound('tap'); setActiveTab('scratch'); }}
+          className="flex flex-col items-center gap-2 cursor-pointer group relative"
+        >
+          <div className="w-14 h-14 rounded-full bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-center text-blue-600 dark:text-blue-400 group-active:scale-95 transition-all">
+             <Gift size={24} />
+          </div>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Scratch</span>
+        </div>
+
         {/* WATCH VIDEO */}
         <div 
           onClick={() => { playSound('tap'); setActiveTab('videos'); }}
@@ -172,7 +183,7 @@ const Dashboard: React.FC = () => {
           <div className="w-14 h-14 rounded-full bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-center text-yellow-600 dark:text-yellow-400 group-active:scale-95 transition-all">
              <PlayCircle size={24} />
           </div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Watch Video</span>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Watch</span>
         </div>
 
         {/* WITHDRAWAL */}
@@ -183,7 +194,7 @@ const Dashboard: React.FC = () => {
           <div className="w-14 h-14 rounded-full bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-center text-orange-600 dark:text-orange-400 group-active:scale-95 transition-all">
              <Wallet size={24} />
           </div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Withdrawal</span>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Withdraw</span>
         </div>
       </div>
 
@@ -258,7 +269,7 @@ const Dashboard: React.FC = () => {
             >
               {currentUser.dailyRewardClaimed ? 'Claimed Today' : 
                isDeviceClaimedToday ? 'Device Limit Reached' :
-               !canClaim ? 'Complete Tasks to Unlock' : 
+               !canClaim ? 'Complete Requirements to Unlock' : 
                `Claim ${rewardAmount} Coins`}
             </button>
           </div>

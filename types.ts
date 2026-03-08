@@ -70,6 +70,9 @@ export interface User {
   spinsToday: number;
   lastSpinTimestamp: number;
   extraSpinWatchedToday: boolean;
+  scratchesToday: number;
+  lastScratchTimestamp: number;
+  extraScratchWatchedToday: boolean;
   status: UserStatus;
   walletFrozen: boolean;
   adsBlocked: boolean;
@@ -89,6 +92,7 @@ export interface User {
 export interface AppSettings {
   maintenanceMode: boolean;
   spinEnabled: boolean;
+  scratchEnabled: boolean;
   videosEnabled: boolean;
   referralsEnabled: boolean;
   adsEnabled: boolean;
@@ -103,11 +107,13 @@ export interface AppSettings {
   spinRewards: number[];
   maxDailySpinsNormal: number;
   spinCooldownMinutes: number;
+  scratchRewards: number[];
+  maxDailyScratchesNormal: number;
+  scratchCooldownMinutes: number;
+  scratchProbabilities: Record<string, number>;
   withdrawalFeeNormal: number;
   minWithdrawalCoins: number;
   withdrawalCooldownHours: number;
-  paymentQrUrl: string;
-  adminUpiId: string;
   maxDailyAds: number;
   dailyWithdrawalLimit: number;
   spinProbabilities: Record<string, number>;

@@ -108,7 +108,7 @@ const SpinWheel: React.FC = () => {
 
       const segmentIndex = selectedRewardIndex;
       const segmentAngle = 360 / settings.spinRewards.length;
-      const extraRotations = 10 * 360; 
+      const extraRotations = 15 * 360; // Increased rotations for a longer, more dramatic spin
       const currentAngleOffset = rotation % 360;
       const randomOffset = (Math.random() * 0.8 - 0.4) * segmentAngle; // +/- 40% of segment
       const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2) + randomOffset;
@@ -128,9 +128,9 @@ const SpinWheel: React.FC = () => {
           setLastReward(settings.spinRewards[segmentIndex]);
           setIsAdPending(false);
           logActivity(currentUser.id, currentUser.name, 'SPIN_RESULT', `Won ${settings.spinRewards[segmentIndex]} coins from wheel`);
-        }, 'REQUIRED');
+        }, 'REQUIRED', () => setIsAdPending(false));
         
-      }, 4000); 
+      }, 5000); // Matched with the new CSS transition duration
     }, 600);
   };
 
@@ -147,7 +147,7 @@ const SpinWheel: React.FC = () => {
         setWinningSegmentIndex(null);
       }
       setIsAdPending(false);
-    }, 'REQUIRED');
+    }, 'REQUIRED', () => setIsAdPending(false));
   };
 
   const handleUnlockExtraSpin = () => {
@@ -163,7 +163,7 @@ const SpinWheel: React.FC = () => {
       setIsAdPending(false);
       playSound('complete');
       alert("Extra turn unlocked! Use it now.");
-    }, 'REQUIRED');
+    }, 'REQUIRED', () => setIsAdPending(false));
   };
 
   return (
@@ -191,7 +191,7 @@ const SpinWheel: React.FC = () => {
           ))}
         </div>
         
-        <div ref={wheelRef} className={`absolute inset-4 rounded-full border-2 border-white/20 shadow-xl overflow-hidden ${isAdBlockerActive ? 'grayscale opacity-20' : ''}`} style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 4000ms cubic-bezier(0.2, 0, 0.1, 1)' }}>
+        <div ref={wheelRef} className={`absolute inset-4 rounded-full border-2 border-white/20 shadow-xl overflow-hidden ${isAdBlockerActive ? 'grayscale opacity-20' : ''}`} style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 5000ms cubic-bezier(0.15, 0.85, 0.15, 1)' }}>
           {settings.spinRewards.map((val, i) => {
             const angle = 360 / settings.spinRewards.length;
             const darkVibrantColors = ['#dc2626', '#d97706', '#059669', '#2563eb', '#4f46e5', '#7c3aed', '#c026d3', '#db2777'];

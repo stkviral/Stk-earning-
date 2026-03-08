@@ -61,7 +61,7 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
     setActionReason('');
   };
 
-  const handleResetCooldown = (type: 'SPIN' | 'ALL') => {
+  const handleResetCooldown = (type: 'SPIN' | 'SCRATCH' | 'ALL') => {
     if (!actionReason) return alert("Reason is required");
     adminActions.resetCooldowns(user.id, type, actionReason);
     setActionReason('');
@@ -74,6 +74,9 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
   };
 
   const handleStatusUpdate = (status: UserStatus) => {
+    if ((status === UserStatus.SUSPENDED || status === UserStatus.BANNED) && !actionReason) {
+      return alert("A reason is required to suspend or ban a user.");
+    }
     const confirm = window.confirm(`Initiate ${status} protocol for ${user.name}?`);
     if (confirm) {
       adminActions.setUserStatus(user.id, status, actionReason || 'Standard protocol override');
@@ -142,6 +145,7 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
               </div>
               <div className="flex gap-2 pt-2 border-t border-gray-800">
                 <button onClick={() => handleResetCooldown('SPIN')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Spin</button>
+                <button onClick={() => handleResetCooldown('SCRATCH')} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors">Reset Scratch</button>
               </div>
             </div>
 
@@ -176,6 +180,10 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
         )}
         {activeTab === 'edit' && (
           <div className="space-y-8">
+            <div className="space-y-3">
+              <label className="text-[9px] font-black text-gray-500 uppercase px-1">Status Reason (Required for Suspension/Ban)</label>
+              <input type="text" placeholder="Reason for status change..." value={actionReason || ''} onChange={e => setActionReason(e.target.value)} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-white font-black outline-none focus:border-blue-600" />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {(Object.values(UserStatus)).map(status => (
                 <button 
@@ -659,8 +667,45 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-8 space-y-8 shadow-2xl">
                      <div className="flex items-center gap-3">
+                        <Sparkles className="text-purple-500" size={24} />
+                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Scratch Setup</h3>
+                     </div>
+                     <div className="grid grid-cols-5 gap-2">
+                        {state.settings.scratchRewards.map((val, idx) => (
+                          <input key={idx} type="number" value={val ?? 0} onChange={e => {
+                             const n = [...state.settings.scratchRewards];
+                             n[idx] = parseInt(e.target.value) || 0;
+                             updateSettings({ scratchRewards: n });
+                          }} className="bg-gray-950 border border-gray-800 p-3 rounded-xl text-center text-xs font-black text-white" />
+                        ))}
+                     </div>
+                     <div className="space-y-2 pt-4 border-t border-gray-800">
+                        <label className="text-[9px] font-black text-gray-600 uppercase">Probabilities (%)</label>
+                        <div className="grid grid-cols-5 gap-2">
+                          {state.settings.scratchRewards.map((val, idx) => (
+                            <input key={`prob-${idx}`} type="number" value={state.settings.scratchProbabilities[val.toString()] ?? 0} onChange={e => {
+                               const p = { ...state.settings.scratchProbabilities };
+                               p[val.toString()] = parseInt(e.target.value) || 0;
+                               updateSettings({ scratchProbabilities: p });
+                            }} className="bg-gray-950 border border-gray-800 p-3 rounded-xl text-center text-xs font-black text-white" />
+                          ))}
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Max Daily Scratches</label>
+                           <input type="number" value={state.settings.maxDailyScratchesNormal ?? 0} onChange={e => updateSettings({ maxDailyScratchesNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Cooldown (Min)</label>
+                           <input type="number" value={state.settings.scratchCooldownMinutes ?? 0} onChange={e => updateSettings({ scratchCooldownMinutes: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                     </div>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-[40px] p-8 space-y-8 shadow-2xl">
+                     <div className="flex items-center gap-3">
                         <PlayCircle className="text-blue-500" size={24} />
-                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Ad Settings</h3>
+                        <h3 className="text-xl font-black uppercase italic tracking-tighter">General Rewards</h3>
                      </div>
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -670,6 +715,18 @@ const AdminPanel: React.FC = () => {
                         <div className="space-y-2">
                            <label className="text-[9px] font-black text-gray-600 uppercase">Max Daily Ads</label>
                            <input type="number" value={state.settings.maxDailyAds ?? 0} onChange={e => updateSettings({ maxDailyAds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Daily Bonus Base</label>
+                           <input type="number" value={state.settings.dailyBonusReward ?? 0} onChange={e => updateSettings({ dailyBonusReward: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Referral Reward</label>
+                           <input type="number" value={state.settings.referralReward ?? 0} onChange={e => updateSettings({ referralReward: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
+                        </div>
+                        <div className="space-y-2 col-span-2">
+                           <label className="text-[9px] font-black text-gray-600 uppercase">Daily Earning Cap</label>
+                           <input type="number" value={state.settings.dailyCapNormal ?? 0} onChange={e => updateSettings({ dailyCapNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-4 rounded-2xl text-center text-white font-black" />
                         </div>
                      </div>
                      <div className="space-y-2 pt-4 border-t border-gray-800">
@@ -792,47 +849,6 @@ const AdminPanel: React.FC = () => {
                              <label className="text-[9px] font-black text-gray-600 uppercase">Daily Withdraw Limit</label>
                              <input type="number" value={state.settings.dailyWithdrawalLimit || 5000} onChange={e => updateSettings({ dailyWithdrawalLimit: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black" />
                           </div>
-                        </div>
-                        <div className="space-y-2 pt-4 border-t border-gray-800">
-                           <label className="text-[9px] font-black text-gray-600 uppercase px-1">Admin UPI ID</label>
-                           <input 
-                              type="text" 
-                              value={state.settings.adminUpiId} 
-                              onChange={e => updateSettings({ adminUpiId: e.target.value })} 
-                              placeholder="e.g. yourname@upi"
-                              className="w-full bg-gray-950 border border-gray-800 p-5 rounded-3xl text-center text-white font-black outline-none focus:border-blue-600" 
-                           />
-                        </div>
-                        <div className="space-y-4 pt-4 border-t border-gray-800">
-                           <label className="text-[9px] font-black text-gray-600 uppercase px-1">Payment QR Code</label>
-                           <div className="flex items-center gap-6">
-                              <div className="w-24 h-24 bg-white rounded-2xl p-2 flex items-center justify-center border-2 border-gray-800 shadow-inner">
-                                 <img src={state.settings.paymentQrUrl} className="w-full h-full object-contain" alt="QR" />
-                              </div>
-                              <div className="flex-1 space-y-3">
-                                 <button 
-                                    onClick={() => document.getElementById('qrUpload')?.click()} 
-                                    className="w-full bg-gray-800 text-white py-3 rounded-xl font-black text-[10px] uppercase border border-gray-700 hover:bg-gray-700 transition-all"
-                                 >
-                                    Upload New QR
-                                 </button>
-                                 <input 
-                                    type="text" 
-                                    value={state.settings.paymentQrUrl} 
-                                    onChange={e => updateSettings({ paymentQrUrl: e.target.value })} 
-                                    placeholder="Or enter URL..."
-                                    className="w-full bg-gray-950 border border-gray-800 p-3 rounded-xl text-white font-black text-[9px] outline-none focus:border-blue-600" 
-                                 />
-                              </div>
-                              <input type="file" id="qrUpload" className="hidden" accept="image/*" onChange={e => {
-                                 const f = e.target.files?.[0];
-                                 if (f) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => updateSettings({ paymentQrUrl: r.result as string });
-                                    r.readAsDataURL(f);
-                                 }
-                              }} />
-                           </div>
                         </div>
                         <div className="flex items-center gap-6 pt-4 border-t border-gray-800">
                            <div className="w-16 h-16 bg-white rounded-2xl p-2 flex items-center justify-center border-2 border-gray-800">
