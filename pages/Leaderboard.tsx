@@ -43,7 +43,7 @@ const Leaderboard: React.FC = () => {
     let spinCount = 0;
     let videoCount = 0;
 
-    currentUser.transactions.forEach(tx => {
+    (currentUser.transactions || []).forEach(tx => {
       if (tx.type === 'EARN' || tx.type === 'CHECKIN' || tx.type === 'SPIN' || tx.type === 'AD') {
         if (tx.method === 'Daily Check-In') checkinCount++;
         if (tx.method === 'Lucky Spin' || tx.type === 'SPIN') spinCount++;

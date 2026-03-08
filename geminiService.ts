@@ -13,7 +13,7 @@ export const BackendAI = {
     try {
       // Fix: Creating instance right before making an API call as per SDK guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const recentTx = user.transactions.slice(0, 5).map(t => `${t.method}: ${t.amount}`).join(", ");
+      const recentTx = (user.transactions || []).slice(0, 5).map(t => `${t.method}: ${t.amount}`).join(", ");
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Analyze this user session for suspicious activity:

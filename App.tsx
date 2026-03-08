@@ -143,7 +143,13 @@ const App: React.FC = () => {
   const updateUser = useCallback((updates: Partial<User>) => {
     setState(prev => {
       if (!prev.currentUser) return prev;
-      const updatedUser = { ...prev.currentUser, ...updates, lastActiveAt: Date.now() };
+      const updatedUser = { 
+        ...prev.currentUser, 
+        transactions: prev.currentUser.transactions || [],
+        referralHistory: prev.currentUser.referralHistory || [],
+        ...updates, 
+        lastActiveAt: Date.now() 
+      };
       return {
         ...prev,
         currentUser: updatedUser,
@@ -287,9 +293,9 @@ const App: React.FC = () => {
       timestamp: Date.now()
     };
     updateUser({
-      coins: state.currentUser.coins + amount,
+      coins: (state.currentUser.coins || 0) + amount,
       dailyEarned: todayEarned + (amount > 0 ? amount : 0),
-      transactions: [transaction, ...state.currentUser.transactions]
+      transactions: [transaction, ...(state.currentUser.transactions || [])]
     });
     return true;
   }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
@@ -506,7 +512,7 @@ const App: React.FC = () => {
       amount: finalAmount, type: 'WITHDRAWAL', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
     };
     
-    const newTransactions = [tx, ...state.currentUser.transactions];
+    const newTransactions = [tx, ...(state.currentUser.transactions || [])];
     updateUser({ coins: state.currentUser.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() });
     
     // Also update allUsers
@@ -521,7 +527,7 @@ const App: React.FC = () => {
 
   const cancelWithdrawal = (txId: string): string | null => {
     if (!state.currentUser) return "User session error";
-    const txIndex = state.currentUser.transactions.findIndex(t => t.id === txId);
+    const txIndex = (state.currentUser.transactions || []).findIndex(t => t.id === txId);
     if (txIndex === -1) return "Transaction not found";
     
     const tx = state.currentUser.transactions[txIndex];
@@ -532,7 +538,7 @@ const App: React.FC = () => {
     const refundAmount = tx.amount + feeAmount;
 
     const updatedTx: Transaction = { ...tx, status: 'REJECTED', rejectionReason: 'Cancelled by user' };
-    const newTransactions = [...state.currentUser.transactions];
+    const newTransactions = [...(state.currentUser.transactions || [])];
     newTransactions[txIndex] = updatedTx;
 
     updateUser({
@@ -554,7 +560,7 @@ const App: React.FC = () => {
   const adminActions = {
     approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => {
       setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) });
+        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
@@ -564,8 +570,8 @@ const App: React.FC = () => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
-          const tx = u.transactions.find(t => t.id === txId);
-          return { ...u, coins: u.coins + (tx?.amount || 0), transactions: u.transactions.map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
+          const tx = (u.transactions || []).find(t => t.id === txId);
+          return { ...u, coins: u.coins + (tx?.amount || 0), transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -601,7 +607,7 @@ const App: React.FC = () => {
             status: 'COMPLETED',
             timestamp: Date.now()
           };
-          return { ...u, coins: Math.max(0, u.coins + amount), transactions: [tx, ...u.transactions] };
+          return { ...u, coins: Math.max(0, u.coins + amount), transactions: [tx, ...(u.transactions || [])] };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };

@@ -169,7 +169,7 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
 
             <div className="space-y-3 pt-4">
               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest px-1">Recent Ledger</p>
-              {user.transactions.slice(0, 5).map(tx => (
+              {(user.transactions || []).slice(0, 5).map(tx => (
                 <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-950 rounded-2xl border border-gray-800">
                   <span className="text-[10px] font-black text-white uppercase italic">{tx.method}</span>
                   <span className={`text-xs font-black ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount}</span>
@@ -256,7 +256,7 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
   const [paymentTxId, setPaymentTxId] = useState<Record<string, string>>({});
 
   const allWithdrawals = useMemo(() => state.allUsers.flatMap(user => 
-    user.transactions
+    (user.transactions || [])
       .filter(tx => (tx.type === 'WITHDRAW' || tx.type === 'WITHDRAWAL'))
       .map(tx => ({ ...tx, userId: user.id, userName: user.name, userEmail: user.email }))
   ), [state.allUsers]);
@@ -443,7 +443,7 @@ const AdminPanel: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const pendingPayouts = useMemo(() => state.allUsers.flatMap(user => 
-    user.transactions
+    (user.transactions || [])
       .filter(tx => tx.type === 'WITHDRAW' && tx.status === 'PENDING')
       .map(tx => ({ ...tx, userId: user.id, userName: user.name }))
   ), [state.allUsers]);
@@ -460,7 +460,7 @@ const AdminPanel: React.FC = () => {
     
     return {
       totalSTK: u.reduce((a, b) => a + b.coins, 0),
-      payouts: u.flatMap(us => us.transactions).filter(t => t.type === 'WITHDRAW' && t.status === 'COMPLETED').reduce((a, b) => a + b.amount, 0),
+      payouts: u.flatMap(us => us.transactions || []).filter(t => t.type === 'WITHDRAW' && t.status === 'COMPLETED').reduce((a, b) => a + b.amount, 0),
       active: u.filter(us => Date.now() - us.lastActiveAt < 3600000).length,
       dailyCheckins,
       dailyCoinsIssued,

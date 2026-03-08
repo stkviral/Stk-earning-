@@ -302,7 +302,7 @@ const Wallet: React.FC = () => {
   };
 
   const filteredTransactions = useMemo(() => {
-    return [...currentUser.transactions]
+    return [...(currentUser.transactions || [])]
       .filter(tx => {
         if (filter === 'ALL') return true;
         if (filter === 'EARN') return tx.type !== 'WITHDRAW' && tx.amount > 0;
