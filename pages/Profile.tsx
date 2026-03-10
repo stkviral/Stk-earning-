@@ -6,7 +6,7 @@ import {
   ChevronRight, Award, Wallet, Settings, 
   Bell, HelpCircle, Info, Share2, Star,
   Crown, ShieldCheck, Activity, Zap,
-  Search, AlertTriangle, CheckCircle2, Loader2
+  Search, AlertTriangle, CheckCircle2, Loader2, FileText
 } from 'lucide-react';
 import { UserTag, UserStatus } from '../types';
 import { playSound } from '../audioUtils';
@@ -40,7 +40,9 @@ const Profile: React.FC = () => {
     { id: 'wallet', icon: Wallet, label: 'My Wallet', desc: 'Manage your earnings', color: 'text-blue-500' },
     { id: 'invite', icon: Share2, label: 'Refer & Earn', desc: 'Invite friends for rewards', color: 'text-green-500' },
     { id: 'faq', icon: Info, label: 'Help & Support', desc: 'FAQ, Withdrawal & App Guide', color: 'text-purple-500' },
-    { id: 'discord', icon: HelpCircle, label: 'Contact Support', desc: 'Join our Discord server', color: 'text-orange-500' },
+    { id: 'privacy', icon: ShieldCheck, label: 'Privacy Policy', desc: 'Data & Privacy', color: 'text-gray-500' },
+    { id: 'terms', icon: FileText, label: 'Terms & Conditions', desc: 'Rules & Agreements', color: 'text-gray-500' },
+    { id: 'support', icon: HelpCircle, label: 'Contact Support', desc: 'supportstkearningapp@gmail.com', color: 'text-orange-500' },
   ];
 
   const handleLogout = () => {
@@ -97,7 +99,22 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-gray-50 dark:border-gray-800">
+          <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800">
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Payment Details (UPI ID)</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Enter your UPI ID (e.g. name@upi)" 
+                  value={currentUser.upiId || ''} 
+                  onChange={(e) => updateUser({ upiId: e.target.value })}
+                  className="flex-1 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-50 dark:border-gray-800">
             <div className="text-center space-y-1">
               <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Balance</p>
               <div className="flex items-center justify-center gap-1.5">
@@ -183,8 +200,12 @@ const Profile: React.FC = () => {
             key={item.id}
             onClick={() => { 
               playSound('tap'); 
-              if (item.id === 'discord') {
-                window.open('https://discord.gg/FrUwmRdunZ', '_blank');
+              if (item.id === 'support') {
+                window.location.href = 'mailto:supportstkearningapp@gmail.com';
+              } else if (item.id === 'privacy') {
+                window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680dcb2b8cc97d2f120bc', '_blank');
+              } else if (item.id === 'terms') {
+                window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680e1903ac5a1dc98d809', '_blank');
               } else {
                 setActiveTab(item.id); 
               }
@@ -225,9 +246,11 @@ const Profile: React.FC = () => {
       {/* Footer Info */}
       <div className="mt-12 text-center space-y-4">
         <div className="flex items-center justify-center gap-4">
-          <button onClick={() => setActiveTab('privacy')} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Privacy</button>
+          <button onClick={() => window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680dcb2b8cc97d2f120bc', '_blank')} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Privacy</button>
           <div className="w-1 h-1 bg-gray-300 rounded-full" />
-          <a href="https://discord.gg/FrUwmRdunZ" target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Support</a>
+          <button onClick={() => window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680e1903ac5a1dc98d809', '_blank')} className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Terms</button>
+          <div className="w-1 h-1 bg-gray-300 rounded-full" />
+          <a href="mailto:supportstkearningapp@gmail.com" className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500">Support</a>
           <div className="w-1 h-1 bg-gray-300 rounded-full" />
           <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">v2.4.0</span>
         </div>

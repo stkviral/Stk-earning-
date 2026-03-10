@@ -54,7 +54,13 @@ const Dashboard: React.FC = () => {
     : (currentUser.streakDays || 0) + 1;
 
   const currentStreak = currentUser.streakDays || 0;
-  const activeMultiplier = currentStreak >= 7 ? 2.0 : 1.0 + currentStreak * 0.1;
+  const getActiveMultiplier = (streak: number) => {
+    if (!streak) return 1.0;
+    const dayInCycle = ((streak - 1) % 7) + 1;
+    if (dayInCycle === 7) return 2.0;
+    return 1.0 + (dayInCycle - 1) * 0.1;
+  };
+  const activeMultiplier = getActiveMultiplier(currentStreak);
   const rewardAmount = currentDay === 7 ? 30 : 5;
 
   const hasWatchedAd = currentUser.adsWatchedToday > 0;

@@ -128,6 +128,12 @@ const ScratchCard: React.FC = () => {
     setIsRevealed(false);
     setScratchedPercentage(0);
     playSound('tap');
+
+    // Deduct scratch immediately to prevent refresh exploits
+    updateUser({
+      scratchesToday: (currentUser.scratchesToday || 0) + 1,
+      lastScratchTimestamp: getServerTime()
+    });
   };
 
   const scratch = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {

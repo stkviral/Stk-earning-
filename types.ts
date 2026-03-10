@@ -135,7 +135,7 @@ export interface AppState {
 
 export const COIN_TO_INR_RATE = 0.01;
 export const AD_GAP_MS = 30000;
-export const MIN_WITHDRAWAL_COINS = 15000;
+export const MIN_WITHDRAWAL_COINS = 1000;
 export const ADMIN_EMAIL = 'admin@stk.com';
 
 declare global {

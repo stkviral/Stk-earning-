@@ -81,15 +81,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   adRewardCoins: 1,
   referralReward: 50,
   spinRewards: [1, 2, 3, 5, 10],
-  maxDailySpinsNormal: 3,
+  maxDailySpinsNormal: 50,
   spinCooldownMinutes: 0,
   scratchRewards: [2, 4, 6, 8, 15],
-  maxDailyScratchesNormal: 3,
+  maxDailyScratchesNormal: 30,
   scratchCooldownMinutes: 0,
   scratchProbabilities: { "2": 40, "4": 30, "6": 20, "8": 9, "15": 1 },
   withdrawalFeeNormal: 0,
-  minWithdrawalCoins: 5000,
-  withdrawalCooldownHours: 48,
+  minWithdrawalCoins: 1000,
+  withdrawalCooldownHours: 24,
   maxDailyAds: 20,
   dailyWithdrawalLimit: 5000,
   spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "10": 1 },
@@ -300,37 +300,36 @@ const App: React.FC = () => {
     return true;
   }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
 
+  const getActiveMultiplier = (streak: number) => {
+    if (!streak) return 1.0;
+    const dayInCycle = ((streak - 1) % 7) + 1;
+    if (dayInCycle === 7) return 2.0;
+    return 1.0 + (dayInCycle - 1) * 0.1;
+  };
+
   const claimSpinReward = useCallback((reward: number): boolean => {
     if (!state.currentUser) return false;
-    const multiplier = state.currentUser.streakDays >= 7 ? 2.0 : 1.0 + (state.currentUser.streakDays || 0) * 0.1;
+    const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
     const success = addCoins(finalReward, 'Spin Reward', 'SPIN');
     if (success) {
-      updateUser({
-        spinsToday: (state.currentUser.spinsToday || 0) + 1,
-        lastSpinTimestamp: getServerTime()
-      });
       logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
-  }, [state.currentUser, addCoins, updateUser, logActivity, getServerTime]);
+  }, [state.currentUser, addCoins, logActivity]);
 
   const claimScratchReward = useCallback((reward: number): boolean => {
     if (!state.currentUser) return false;
-    const multiplier = state.currentUser.streakDays >= 7 ? 2.0 : 1.0 + (state.currentUser.streakDays || 0) * 0.1;
+    const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
     const success = addCoins(finalReward, 'Scratch Reward', 'SPIN'); // Using SPIN type for now
     if (success) {
-      updateUser({
-        scratchesToday: (state.currentUser.scratchesToday || 0) + 1,
-        lastScratchTimestamp: getServerTime()
-      });
       logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
-  }, [state.currentUser, addCoins, updateUser, logActivity, getServerTime]);
+  }, [state.currentUser, addCoins, logActivity]);
 
   const claimDailyCheckIn = useCallback((): boolean => {
     if (!state.currentUser) return false;
@@ -362,8 +361,8 @@ const App: React.FC = () => {
       return;
     }
     const now = getServerTime();
-    if (now - lastRewardTimeRef.current < 20000) {
-      alert("Please wait before earning again.");
+    if (type === 'REWARD' && now - lastRewardTimeRef.current < 5000) {
+      alert("Please wait 5 seconds before earning again.");
       if (onClose) onClose();
       return;
     }
@@ -496,7 +495,7 @@ const App: React.FC = () => {
     if (state.currentUser.walletFrozen) return "Your wallet is frozen.";
     if (state.currentUser.coins < amount) return "Insufficient balance";
     if (amount < state.settings.minWithdrawalCoins) return `Minimum withdrawal is ${state.settings.minWithdrawalCoins} coins.`;
-    const cooldownMs = (state.settings.withdrawalCooldownHours || 48) * 60 * 60 * 1000;
+    const cooldownMs = (state.settings.withdrawalCooldownHours || 24) * 60 * 60 * 1000;
     const nextAllowed = (state.currentUser.lastWithdrawalTimestamp || 0) + cooldownMs;
     if (Date.now() < nextAllowed) return "Withdrawal Cooldown: Please wait before next request.";
     const upiRegex = /^[\w\.-]+@[\w\.-]+$/;

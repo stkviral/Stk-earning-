@@ -10,7 +10,7 @@ const PrivacyPolicy: React.FC = () => {
   const handleBack = () => {
     playSound('tap');
     if (state.isLoggedIn) {
-      setActiveTab('faq');
+      setActiveTab('profile');
     } else {
       setActiveTab('home'); // Resets to login screen
     }

@@ -63,7 +63,7 @@ const FAQ: React.FC = () => {
         <FAQItem 
           icon={<Coins size={24} />}
           question="How much are coins worth?" 
-          answer="The math is simple: 100 Coins = ₹10. Your balance is updated in real-time."
+          answer="The math is simple: 1,000 Coins = ₹10. Your balance is updated in real-time."
         />
         <FAQItem 
           icon={<Users size={24} />}
@@ -80,7 +80,7 @@ const FAQ: React.FC = () => {
         <FAQItem 
           icon={<CreditCard size={24} />}
           question="Minimum Withdrawal" 
-          answer="You can withdraw once you reach 500 Coins (₹50). Payments are sent directly to your UPI ID."
+          answer="You can withdraw once you reach 1,000 Coins (₹10). Payments are sent directly to your UPI ID."
         />
         <FAQItem 
           icon={<ShieldCheck size={24} />}
@@ -102,12 +102,12 @@ const FAQ: React.FC = () => {
         <FAQItem 
           icon={<Zap size={24} />}
           question="How to earn coins?" 
-          answer="You can earn coins by watching videos, spinning the lucky wheel, and claiming your daily check-in rewards."
+          answer="You can earn coins by watching videos, spinning the lucky wheel, scratching cards, and claiming your daily check-in rewards. There is a daily earning cap of 200 coins to ensure fairness."
         />
         <FAQItem 
           icon={<Disc size={24} />}
-          question="Lucky Spin" 
-          answer="Test your luck daily. You get 5 spins per day."
+          question="Daily Limits" 
+          answer="To keep the economy balanced, you get 50 spins, 30 scratch cards, and 20 video ads per day."
         />
         <FAQItem 
           icon={<HelpCircle size={24} />}
@@ -126,9 +126,7 @@ const FAQ: React.FC = () => {
             Our support team is here to help you with any issues or withdrawal questions.
           </p>
           <a 
-            href="https://discord.gg/FrUwmRdunZ" 
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:supportstkearningapp@gmail.com" 
             className="inline-flex bg-white text-blue-600 px-8 py-4 rounded-[24px] font-black text-[11px] uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all hover:brightness-110"
           >
             Contact Support
@@ -137,7 +135,7 @@ const FAQ: React.FC = () => {
       </div>
 
       <button 
-        onClick={() => { playSound('tap'); setActiveTab('privacy'); }}
+        onClick={() => { playSound('tap'); window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680dcb2b8cc97d2f120bc', '_blank'); }}
         className="w-full flex items-center justify-between p-7 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[40px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all active:scale-95 shadow-lg group"
       >
         <div className="flex items-center gap-4">
@@ -145,6 +143,19 @@ const FAQ: React.FC = () => {
             <FileText size={20} className="group-hover:text-blue-600" />
           </div>
           <span className="text-[11px] font-black uppercase tracking-[0.2em]">Privacy Policy</span>
+        </div>
+        <ChevronRight size={20} />
+      </button>
+
+      <button 
+        onClick={() => { playSound('tap'); window.open('https://peaceful-cupcake-f93.notion.site/31d3671afa0680e1903ac5a1dc98d809', '_blank'); }}
+        className="w-full flex items-center justify-between p-7 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[40px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all active:scale-95 shadow-lg group"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center transition-colors group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30">
+            <FileText size={20} className="group-hover:text-blue-600" />
+          </div>
+          <span className="text-[11px] font-black uppercase tracking-[0.2em]">Terms & Conditions</span>
         </div>
         <ChevronRight size={20} />
       </button>

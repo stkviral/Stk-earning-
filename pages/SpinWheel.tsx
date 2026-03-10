@@ -83,6 +83,12 @@ const SpinWheel: React.FC = () => {
     setWinningSegmentIndex(null);
     setIsWobbling(true);
 
+    // Deduct spin immediately to prevent refresh exploits
+    updateUser({
+      spinsToday: (currentUser.spinsToday || 0) + 1,
+      lastSpinTimestamp: getServerTime()
+    });
+
     setTimeout(() => {
       setIsWobbling(false);
       setSpinning(true);
