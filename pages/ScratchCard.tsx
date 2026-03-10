@@ -209,8 +209,8 @@ const ScratchCard: React.FC = () => {
 
     setIsAdPending(true);
     // MANDATORY AD BEFORE EVERY CLAIM
-    playAd(() => {
-      const success = claimScratchReward(reward!);
+    playAd(async () => {
+      const success = await claimScratchReward(reward!);
       if (success) {
         playSound('collect');
         setReward(null);

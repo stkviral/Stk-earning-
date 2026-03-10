@@ -92,6 +92,19 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-4 space-y-6 animate-in fade-in duration-500 relative overflow-hidden bg-gray-50 dark:bg-gray-950 pb-32 min-h-full">
       
+      {/* Device Limit Banner */}
+      {isDeviceLimitReached && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm relative z-10 animate-in slide-in-from-top-2">
+           <div className="bg-red-100 dark:bg-red-800 p-2 rounded-lg shrink-0">
+              <ShieldAlert size={20} className="text-red-600 dark:text-red-400" />
+           </div>
+           <div className="flex-1 min-w-0">
+              <p className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1">Device Limit Reached</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 leading-snug">You have reached the maximum number of accounts allowed on this device. Earning and withdrawals are restricted.</p>
+           </div>
+        </div>
+      )}
+
       {/* Global Broadcast Notification */}
       {showNotification && settings.systemNotification && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-3 flex items-start gap-3 shadow-sm relative z-10 animate-in slide-in-from-top-2">

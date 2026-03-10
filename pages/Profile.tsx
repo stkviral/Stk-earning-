@@ -99,7 +99,7 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800">
+          <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800 space-y-4">
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Payment Details (UPI ID)</label>
               <div className="flex items-center gap-2">
@@ -111,6 +111,58 @@ const Profile: React.FC = () => {
                   className="flex-1 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Phone Number</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="tel" 
+                  placeholder="+91 9876543210" 
+                  value={currentUser.phone || ''} 
+                  onChange={(e) => updateUser({ phone: e.target.value })}
+                  className="flex-1 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Date of Birth</label>
+                <input 
+                  type="date" 
+                  value={currentUser.dob || ''} 
+                  onChange={(e) => updateUser({ dob: e.target.value })}
+                  className="w-full bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Gender</label>
+                <select 
+                  value={currentUser.gender || ''} 
+                  onChange={(e) => updateUser({ gender: e.target.value })}
+                  className="w-full bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:border-blue-500 transition-colors appearance-none"
+                >
+                  <option value="" disabled>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-950 p-4 rounded-2xl border border-gray-200 dark:border-gray-800">
+              <div>
+                <p className="text-sm font-black text-gray-900 dark:text-white uppercase italic tracking-tight">Push Notifications</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Receive updates & offers</p>
+              </div>
+              <button 
+                onClick={() => { playSound('tap'); updateUser({ pushEnabled: !currentUser.pushEnabled }); }}
+                className={`w-12 h-6 rounded-full transition-all relative ${currentUser.pushEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${currentUser.pushEnabled ? 'left-7' : 'left-1'}`} />
+              </button>
             </div>
           </div>
 

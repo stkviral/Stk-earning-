@@ -2,7 +2,7 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { 
   User, UserTag, UserStatus, AppState, Transaction,
-  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL
+  COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL, SuspiciousActivityLog
 } from './types';
 import Dashboard from './pages/Dashboard';
 import SpinWheel from './pages/SpinWheel';
@@ -19,6 +19,7 @@ import ScratchCard from './pages/ScratchCard';
 import Navigation from './components/Navigation';
 import AdOverlay from './components/AdOverlay';
 import Header from './components/Header';
+import Onboarding from './components/Onboarding';
 import { ShieldOff, RefreshCw, Server, Ban } from 'lucide-react';
 import { BackendAI } from './geminiService';
 
@@ -44,6 +45,7 @@ interface AppContextType {
   checkAdBlocker: () => Promise<boolean>;
   logAdminAction: (action: string, targetId: string, details: string) => void;
   logActivity: (userId: string, userName: string, action: string, details: string) => void;
+  logSuspiciousActivity: (userId: string, userName: string, reason: string, details: string) => void;
   updateDeviceClaim: (deviceId: string, timestamp: number) => void;
   adminActions: {
     approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => void;
@@ -54,6 +56,9 @@ interface AppContextType {
     resetCooldowns: (userId: string, type: 'SPIN' | 'ALL', reason: string) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
+    clearDeviceLimitForUser: (userId: string) => void;
+    clearDeviceLimitForDevice: (deviceId: string) => void;
+    resetDeviceRestrictions: () => void;
   }
 }
 
@@ -94,7 +99,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   dailyWithdrawalLimit: 5000,
   spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "10": 1 },
   emergencyRewardReduction: 0,
-  globalRewardMultiplier: 1
+  globalRewardMultiplier: 1,
+  deviceLimitEnabled: true,
+  maxAccountsPerDevice: 3,
+  exemptDevices: [],
+  dailyRewardBudget: 100000,
+  rewardDelayMs: 2000,
+  autoFlagWithdrawals: true
 };
 
 const App: React.FC = () => {
@@ -109,6 +120,7 @@ const App: React.FC = () => {
       settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
       logs: parsed?.logs || [],
       activityLogs: parsed?.activityLogs || [],
+      suspiciousActivityLogs: parsed?.suspiciousActivityLogs || [],
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       deviceClaims: parsed?.deviceClaims || {},
       isAdBlockerActive: false,
@@ -236,6 +248,14 @@ const App: React.FC = () => {
   const updateSettings = (updates: Partial<AppSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...updates } }));
   const updateDeviceClaim = (deviceId: string, timestamp: number) => setState(prev => ({ ...prev, deviceClaims: { ...prev.deviceClaims, [deviceId]: timestamp } }));
 
+  const logSuspiciousActivity = useCallback((userId: string, userName: string, reason: string, details: string) => {
+    const newLog: SuspiciousActivityLog = { 
+      id: Math.random().toString(36).substring(2, 9), 
+      userId, userName, reason, details, timestamp: getServerTime() 
+    };
+    setState(prev => ({ ...prev, suspiciousActivityLogs: [newLog, ...(prev.suspiciousActivityLogs || [])].slice(0, 500) }));
+  }, [getServerTime]);
+
   const logActivity = useCallback((userId: string, userName: string, action: string, details: string) => {
     const newLog: ActivityLog = { 
       id: Math.random().toString(36).substring(2, 9), 
@@ -261,6 +281,14 @@ const App: React.FC = () => {
       alert("Reward Blocked: Please disable your ad-blocker to receive coins.");
       return false;
     }
+
+    // Auto-clicker protection (actions too fast)
+    const now = getServerTime();
+    if (!state.isAdminSession && !state.currentUser.fraudDetectionExempt && now - lastRewardTimeRef.current < 500 && baseAmount > 0) {
+      logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'AUTO_CLICKER', `Claimed ${baseAmount} coins in under 500ms`);
+      return false;
+    }
+    lastRewardTimeRef.current = now;
     
     // Apply global multiplier and emergency reduction
     let amount = baseAmount;
@@ -269,12 +297,34 @@ const App: React.FC = () => {
       if (state.settings.emergencyRewardReduction > 0) {
         amount = Math.floor(amount * (1 - (state.settings.emergencyRewardReduction / 100)));
       }
+      
+      // Dynamic Reward Balancer
+      if (type !== 'WITHDRAWAL' && type !== 'ADJUST') {
+        const todayStart = new Date().setHours(0, 0, 0, 0);
+        const dailyCoinsIssued = (state.activityLogs || [])
+          .filter(l => l.timestamp > todayStart && (l.action === 'SPIN_CLAIM' || l.action === 'SCRATCH_CLAIM' || l.action === 'DAILY_BONUS' || l.action === 'AD_REWARD'))
+          .reduce((acc, log) => {
+            const match = log.details.match(/Won (\d+)/) || log.details.match(/\((\d+) coins\)/);
+            return acc + (match ? parseInt(match[1]) : 0);
+          }, 0);
+
+        if (dailyCoinsIssued >= (state.settings.dailyRewardBudget || 100000)) {
+          amount = Math.max(1, Math.floor(amount * 0.5)); // Reduce by 50% if budget reached
+          logSuspiciousActivity('SYSTEM', 'SYSTEM', 'BUDGET_REACHED', `Daily reward budget reached. Reduced reward from ${baseAmount} to ${amount}.`);
+        }
+      }
     }
 
     const todayEarned = state.currentUser.dailyEarned || 0;
     const dailyCap = state.settings.dailyCapNormal;
 
-    if (todayEarned + amount > dailyCap && amount > 0) {
+    // Abnormal farming detection
+    if (!state.isAdminSession && !state.currentUser.fraudDetectionExempt && amount > dailyCap * 0.5 && type !== 'REFERRAL' && type !== 'WITHDRAWAL') {
+       logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'ABNORMAL_FARMING', `Attempted to claim unusually large amount: ${amount} via ${method}`);
+       // Don't block, but flag it
+    }
+
+    if (!state.isAdminSession && !state.currentUser.rewardLimitExempt && todayEarned + amount > dailyCap && amount > 0) {
       const allowed = dailyCap - todayEarned;
       if (allowed <= 0) {
         alert("Daily earning cap reached!");
@@ -290,7 +340,7 @@ const App: React.FC = () => {
       type,
       method,
       status: 'COMPLETED',
-      timestamp: Date.now()
+      timestamp: now
     };
     updateUser({
       coins: (state.currentUser.coins || 0) + amount,
@@ -298,7 +348,7 @@ const App: React.FC = () => {
       transactions: [transaction, ...(state.currentUser.transactions || [])]
     });
     return true;
-  }, [state.currentUser, state.settings, state.isAdBlockerActive, updateUser]);
+  }, [state.currentUser, state.settings, state.activityLogs, state.isAdBlockerActive, updateUser, getServerTime, logSuspiciousActivity]);
 
   const getActiveMultiplier = (streak: number) => {
     if (!streak) return 1.0;
@@ -307,8 +357,11 @@ const App: React.FC = () => {
     return 1.0 + (dayInCycle - 1) * 0.1;
   };
 
-  const claimSpinReward = useCallback((reward: number): boolean => {
+  const claimSpinReward = useCallback(async (reward: number): Promise<boolean> => {
     if (!state.currentUser) return false;
+    if (state.settings.rewardDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, state.settings.rewardDelayMs));
+    }
     const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
@@ -317,10 +370,13 @@ const App: React.FC = () => {
       logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
-  }, [state.currentUser, addCoins, logActivity]);
+  }, [state.currentUser, state.settings.rewardDelayMs, addCoins, logActivity]);
 
-  const claimScratchReward = useCallback((reward: number): boolean => {
+  const claimScratchReward = useCallback(async (reward: number): Promise<boolean> => {
     if (!state.currentUser) return false;
+    if (state.settings.rewardDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, state.settings.rewardDelayMs));
+    }
     const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
@@ -329,7 +385,7 @@ const App: React.FC = () => {
       logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
-  }, [state.currentUser, addCoins, logActivity]);
+  }, [state.currentUser, state.settings.rewardDelayMs, addCoins, logActivity]);
 
   const claimDailyCheckIn = useCallback((): boolean => {
     if (!state.currentUser) return false;
@@ -488,6 +544,29 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const calculateRiskScore = useCallback((user: User) => {
+    if (user.fraudDetectionExempt || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || state.adminUsers.some(a => a.email.toLowerCase() === user.email.toLowerCase())) return 0;
+    let score = 0;
+    
+    // Check for shared Device ID
+    const sharedDevice = state.allUsers.filter(u => u.deviceId === user.deviceId && u.id !== user.id).length;
+    if (sharedDevice > 0) score += sharedDevice * 20;
+
+    // Check for shared IP
+    const sharedIp = state.allUsers.filter(u => u.lastIp === user.lastIp && u.id !== user.id).length;
+    if (sharedIp > 0) score += sharedIp * 10;
+
+    // Check earning velocity (if they earned more than daily cap)
+    const dailyCap = state.settings.dailyCapNormal;
+    if (user.dailyEarned > dailyCap * 2) score += 30;
+
+    // Check referral abuse (if many referrals have same IP)
+    const suspiciousReferrals = state.allUsers.filter(u => u.referredBy === user.referralCode && u.lastIp === user.lastIp).length;
+    if (suspiciousReferrals > 0) score += suspiciousReferrals * 25;
+
+    return Math.min(100, score);
+  }, [state.allUsers, state.settings.dailyCapNormal, state.adminUsers]);
+
   const withdraw = (upiId: string, amount: number): string | null => {
     if (!state.currentUser) return "User session error";
     if (state.currentUser.status === UserStatus.SUSPENDED) return `Account Suspended: ${state.currentUser.statusReason || 'Violation of terms'}`;
@@ -505,10 +584,22 @@ const App: React.FC = () => {
     const feeAmount = Math.floor(amount * (feePercentage / 100));
     const finalAmount = amount - feeAmount;
 
+    let txStatus: Transaction['status'] = 'PENDING';
+    let txMethod = `UPI: ${upiId} (Fee: ${feeAmount})`;
+
+    // Withdrawal Risk Filter
+    if (state.settings.autoFlagWithdrawals && !state.isAdminSession && !state.currentUser.withdrawalFlagExempt) {
+      const riskScore = calculateRiskScore(state.currentUser);
+      if (riskScore > 50) {
+        txMethod += ' [FLAGGED: HIGH RISK]';
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'HIGH_RISK_WITHDRAWAL', `User with risk score ${riskScore} requested withdrawal of ${amount} coins.`);
+      }
+    }
+
     const tx: Transaction = {
       id: 'WD-' + Math.random().toString(36).substring(2, 9),
       userId: state.currentUser.id,
-      amount: finalAmount, type: 'WITHDRAWAL', method: `UPI: ${upiId} (Fee: ${feeAmount})`, status: 'PENDING', timestamp: Date.now()
+      amount: finalAmount, type: 'WITHDRAWAL', method: txMethod, status: txStatus, timestamp: Date.now()
     };
     
     const newTransactions = [tx, ...(state.currentUser.transactions || [])];
@@ -645,6 +736,29 @@ const App: React.FC = () => {
       if (!user) return alert("User not found!");
       setState(prev => ({ ...prev, currentUser: user }));
       setActiveTab('home');
+    },
+    clearDeviceLimitForUser: (userId: string) => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, deviceLimitExempt: true });
+        const updated = newAllUsers.find(u => u.id === userId);
+        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+      });
+      logAdminAction('DEVICE_LIMIT_EXEMPT', userId, 'Exempted user from device limits');
+    },
+    clearDeviceLimitForDevice: (deviceId: string) => {
+      setState(prev => {
+        const newExempt = [...(prev.settings.exemptDevices || [])];
+        if (!newExempt.includes(deviceId)) newExempt.push(deviceId);
+        return { ...prev, settings: { ...prev.settings, exemptDevices: newExempt } };
+      });
+      logAdminAction('DEVICE_LIMIT_EXEMPT_DEVICE', 'SYSTEM', `Exempted device ${deviceId} from limits`);
+    },
+    resetDeviceRestrictions: () => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceLimitExempt: false }));
+        return { ...prev, allUsers: newAllUsers, settings: { ...prev.settings, exemptDevices: [] } };
+      });
+      logAdminAction('DEVICE_LIMIT_RESET', 'SYSTEM', 'Reset all device limit exemptions globally');
     }
   };
 
@@ -693,29 +807,14 @@ const App: React.FC = () => {
     }
   };
 
-  const calculateRiskScore = useCallback((user: User) => {
-    let score = 0;
+  const isDeviceLimitReached = React.useMemo(() => {
+    if (!state.currentUser || !state.settings.deviceLimitEnabled) return false;
+    if (state.isAdminSession || state.currentUser.deviceLimitExempt) return false;
+    if (state.settings.exemptDevices?.includes(state.currentUser.deviceId)) return false;
     
-    // Check for shared Device ID
-    const sharedDevice = state.allUsers.filter(u => u.deviceId === user.deviceId && u.id !== user.id).length;
-    if (sharedDevice > 0) score += sharedDevice * 20;
-
-    // Check for shared IP
-    const sharedIp = state.allUsers.filter(u => u.lastIp === user.lastIp && u.id !== user.id).length;
-    if (sharedIp > 0) score += sharedIp * 10;
-
-    // Check earning velocity (if they earned more than daily cap)
-    const dailyCap = state.settings.dailyCapNormal;
-    if (user.dailyEarned > dailyCap * 2) score += 30;
-
-    // Check referral abuse (if many referrals have same IP)
-    const suspiciousReferrals = state.allUsers.filter(u => u.referredBy === user.referralCode && u.lastIp === user.lastIp).length;
-    if (suspiciousReferrals > 0) score += suspiciousReferrals * 25;
-
-    return Math.min(100, score);
-  }, [state.allUsers, state.settings.dailyCapNormal]);
-
-  const isDeviceLimitReached = state.currentUser ? state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId).length > 3 : false;
+    const accountsOnDevice = state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId).length;
+    return accountsOnDevice > (state.settings.maxAccountsPerDevice || 3);
+  }, [state.currentUser, state.settings, state.isAdminSession, state.allUsers]);
 
   return (
     <AppContext.Provider value={{
@@ -723,7 +822,7 @@ const App: React.FC = () => {
       claimSpinReward, claimScratchReward, claimDailyCheckIn,
       playAd, login, logout, 
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
-      checkAdBlocker, logAdminAction, logActivity, updateDeviceClaim, adminActions
+      checkAdBlocker, logAdminAction, logActivity, logSuspiciousActivity, updateDeviceClaim, adminActions
     }}>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-gray-50 dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         {state.isLoggedIn && <Header isAdmin={state.isAdminSession} />}
@@ -748,6 +847,7 @@ const App: React.FC = () => {
           <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
         {adConfig && <AdOverlay type={adConfig.type} onReward={adConfig.onReward} onClose={adConfig.onClose} />}
+        <Onboarding />
       </div>
     </AppContext.Provider>
   );

@@ -51,6 +51,15 @@ export interface ActivityLog {
   timestamp: number;
 }
 
+export interface SuspiciousActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  reason: string;
+  details: string;
+  timestamp: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -79,6 +88,10 @@ export interface User {
   statusReason?: string;
   statusExpiresAt?: number;
   upiId?: string;
+  phone?: string;
+  pushEnabled?: boolean;
+  dob?: string;
+  gender?: string;
   transactions: Transaction[];
   referralHistory: any[];
   deviceId: string;
@@ -87,6 +100,11 @@ export interface User {
   earningVelocity: number;
   lastActiveAt: number;
   lastWithdrawalTimestamp?: number;
+  hasCompletedOnboarding?: boolean;
+  deviceLimitExempt?: boolean;
+  rewardLimitExempt?: boolean;
+  withdrawalFlagExempt?: boolean;
+  fraudDetectionExempt?: boolean;
 }
 
 export interface AppSettings {
@@ -119,6 +137,12 @@ export interface AppSettings {
   spinProbabilities: Record<string, number>;
   emergencyRewardReduction: number;
   globalRewardMultiplier: number;
+  deviceLimitEnabled: boolean;
+  maxAccountsPerDevice: number;
+  exemptDevices: string[];
+  dailyRewardBudget: number;
+  rewardDelayMs: number;
+  autoFlagWithdrawals: boolean;
 }
 
 export interface AppState {
@@ -129,6 +153,7 @@ export interface AppState {
   settings: AppSettings;
   logs: AdminLog[];
   activityLogs: ActivityLog[];
+  suspiciousActivityLogs: SuspiciousActivityLog[];
   adminUsers: AdminUser[];
   deviceClaims: Record<string, number>;
 }

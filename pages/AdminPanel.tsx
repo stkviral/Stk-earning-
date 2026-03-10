@@ -11,7 +11,7 @@ import {
 import { User, UserTag, UserStatus, COIN_TO_INR_RATE, AppSettings } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs';
+type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs' | 'security';
 
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
   <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl space-y-3 shadow-lg flex flex-col justify-between">
@@ -151,9 +151,33 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Recent Transactions</h3>
                   <div className="space-y-2">
                      {(user.transactions || []).slice(0, 5).map(tx => (
-                        <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-950 rounded-lg border border-gray-800">
-                           <span className="text-sm font-medium text-gray-300">{tx.method}</span>
-                           <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount}</span>
+                        <div key={tx.id} className="flex flex-col p-3 bg-gray-950 rounded-lg border border-gray-800">
+                           <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-300">{tx.method}</span>
+                              <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount}</span>
+                           </div>
+                           {tx.type === 'WITHDRAW' && tx.status === 'PENDING' && (
+                              <div className="mt-2 pt-2 border-t border-gray-800 flex gap-2">
+                                 <button 
+                                    onClick={() => {
+                                       const txId = prompt("Enter Payment TxID to approve:");
+                                       if (txId) adminActions.approveWithdrawal(user.id, tx.id, txId);
+                                    }}
+                                    className="flex-1 bg-green-600/20 text-green-500 hover:bg-green-600/30 py-1.5 rounded text-xs font-bold transition-colors"
+                                 >
+                                    Approve
+                                 </button>
+                                 <button 
+                                    onClick={() => {
+                                       const reason = prompt("Enter Rejection Reason:");
+                                       if (reason) adminActions.rejectWithdrawal(user.id, tx.id, reason);
+                                    }}
+                                    className="flex-1 bg-red-600/20 text-red-500 hover:bg-red-600/30 py-1.5 rounded text-xs font-bold transition-colors"
+                                 >
+                                    Reject
+                                 </button>
+                              </div>
+                           )}
                         </div>
                      ))}
                   </div>
@@ -214,6 +238,59 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                       <AlertTriangle size={18} /> High Risk
                    </div>
                 )}
+             </div>
+             <div className="pt-6 border-t border-gray-800">
+                <h3 className="text-lg font-semibold text-white mb-4">System Exemptions</h3>
+                <div className="space-y-3">
+                   <div className="flex items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800">
+                      <div>
+                         <p className="text-sm font-semibold text-gray-300">Device Limit Exempted</p>
+                         <p className="text-xs text-gray-500 mt-1">Bypass max accounts per device rule.</p>
+                      </div>
+                      <button 
+                         onClick={() => adminActions.updateUserSettings(user.id, { deviceLimitExempt: !user.deviceLimitExempt })}
+                         className={`w-14 h-8 rounded-full transition-all relative ${user.deviceLimitExempt ? 'bg-green-500' : 'bg-gray-700'}`}
+                      >
+                         <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${user.deviceLimitExempt ? 'left-7' : 'left-1'}`} />
+                      </button>
+                   </div>
+                   <div className="flex items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800">
+                      <div>
+                         <p className="text-sm font-semibold text-gray-300">Reward Limit Exempted</p>
+                         <p className="text-xs text-gray-500 mt-1">Bypass daily earning caps.</p>
+                      </div>
+                      <button 
+                         onClick={() => adminActions.updateUserSettings(user.id, { rewardLimitExempt: !user.rewardLimitExempt })}
+                         className={`w-14 h-8 rounded-full transition-all relative ${user.rewardLimitExempt ? 'bg-green-500' : 'bg-gray-700'}`}
+                      >
+                         <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${user.rewardLimitExempt ? 'left-7' : 'left-1'}`} />
+                      </button>
+                   </div>
+                   <div className="flex items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800">
+                      <div>
+                         <p className="text-sm font-semibold text-gray-300">Withdrawal Flag Exempted</p>
+                         <p className="text-xs text-gray-500 mt-1">Bypass automatic high-risk flags on withdrawals.</p>
+                      </div>
+                      <button 
+                         onClick={() => adminActions.updateUserSettings(user.id, { withdrawalFlagExempt: !user.withdrawalFlagExempt })}
+                         className={`w-14 h-8 rounded-full transition-all relative ${user.withdrawalFlagExempt ? 'bg-green-500' : 'bg-gray-700'}`}
+                      >
+                         <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${user.withdrawalFlagExempt ? 'left-7' : 'left-1'}`} />
+                      </button>
+                   </div>
+                   <div className="flex items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800">
+                      <div>
+                         <p className="text-sm font-semibold text-gray-300">Fraud Detection Exempted</p>
+                         <p className="text-xs text-gray-500 mt-1">Bypass risk scoring and suspicious activity logging.</p>
+                      </div>
+                      <button 
+                         onClick={() => adminActions.updateUserSettings(user.id, { fraudDetectionExempt: !user.fraudDetectionExempt })}
+                         className={`w-14 h-8 rounded-full transition-all relative ${user.fraudDetectionExempt ? 'bg-green-500' : 'bg-gray-700'}`}
+                      >
+                         <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${user.fraudDetectionExempt ? 'left-7' : 'left-1'}`} />
+                      </button>
+                   </div>
+                </div>
              </div>
           </div>
         )}
@@ -350,7 +427,7 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
 };
 
 const AdminPanel: React.FC = () => {
-  const { state, updateSettings, updateLogo, calculateRiskScore } = useApp();
+  const { state, updateSettings, updateLogo, calculateRiskScore, adminActions } = useApp();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
@@ -406,11 +483,12 @@ const AdminPanel: React.FC = () => {
          <NavItem tab="payouts" icon={CreditCard} label="Pay" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
          <NavItem tab="features" icon={Sliders} label="Rewards" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
          <NavItem tab="system" icon={Settings} label="System" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
+         <NavItem tab="security" icon={ShieldAlert} label="Security" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
          <NavItem tab="activity" icon={Activity} label="Logs" activeTab={activeTab} setActiveTab={setActiveTab} setViewingUserId={setViewingUserId} />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-         {viewingUserId ? (
+         {viewingUserId && state.allUsers.find(u => u.id === viewingUserId) ? (
             <UserDetailView user={state.allUsers.find(u => u.id === viewingUserId)!} onBack={() => setViewingUserId(null)} />
          ) : (
             <div className="space-y-6 animate-in fade-in duration-500 w-full">
@@ -450,6 +528,47 @@ const AdminPanel: React.FC = () => {
                            </ResponsiveContainer>
                         </div>
                      </div>
+
+                     {/* Recent Pending Withdrawals */}
+                     <div className="bg-gray-900 border border-gray-800 p-4 rounded-2xl shadow-lg">
+                        <div className="flex items-center justify-between mb-4">
+                           <h3 className="text-sm font-semibold text-white">Pending Withdrawals</h3>
+                           <button 
+                              onClick={() => setActiveTab('payouts')}
+                              className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
+                           >
+                              View All <ChevronRight size={14} />
+                           </button>
+                        </div>
+                        <div className="space-y-3">
+                           {state.allUsers.flatMap(u => 
+                              (u.transactions || [])
+                                 .filter(tx => tx.type === 'WITHDRAW' && tx.status === 'PENDING')
+                                 .map(tx => ({ ...tx, userName: u.name, userId: u.id }))
+                           ).sort((a, b) => b.timestamp - a.timestamp).slice(0, 3).map(tx => (
+                              <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                                 <div>
+                                    <p className="text-sm font-semibold text-white">{tx.userName}</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{new Date(tx.timestamp).toLocaleString()}</p>
+                                 </div>
+                                 <div className="text-right">
+                                    <p className="text-sm font-bold text-yellow-500">₹{(tx.amount * COIN_TO_INR_RATE).toFixed(2)}</p>
+                                    <button 
+                                       onClick={() => { setActiveTab('payouts'); setViewingUserId(tx.userId); }}
+                                       className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1 hover:text-blue-300 transition-colors"
+                                    >
+                                       Review
+                                    </button>
+                                 </div>
+                              </div>
+                           ))}
+                           {analytics.pendingWithdrawals === 0 && (
+                              <div className="text-center py-6 text-gray-500 text-sm">
+                                 No pending withdrawals.
+                              </div>
+                           )}
+                        </div>
+                     </div>
                   </div>
                )}
 
@@ -484,6 +603,11 @@ const AdminPanel: React.FC = () => {
                                           {u.status}
                                        </span>
                                        <span className="text-xs text-gray-400">{u.coins} Coins</span>
+                                       {(u.deviceLimitExempt || u.rewardLimitExempt || u.withdrawalFlagExempt || u.fraudDetectionExempt) && (
+                                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-500">
+                                             Exempted
+                                          </span>
+                                       )}
                                     </div>
                                  </div>
                               </div>
@@ -693,6 +817,171 @@ const AdminPanel: React.FC = () => {
                                  </button>
                               </div>
                            ))}
+                        </div>
+                     </div>
+                  </div>
+               )}
+
+               {activeTab === 'security' && (
+                  <div className="space-y-6">
+                     <h2 className="text-xl font-bold text-white mb-4">Security & Anti-Fraud</h2>
+                     
+                     {/* Device Limit Control */}
+                     <div className="bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-lg space-y-4">
+                        <div className="flex items-center gap-3 border-b border-gray-800 pb-3">
+                           <Laptop className="text-blue-500" size={20} />
+                           <h3 className="text-base font-bold text-white">Device Limit Control</h3>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                           <div>
+                              <p className="text-sm font-semibold text-gray-300">Enable Device Limits</p>
+                              <p className="text-xs text-gray-500 mt-1">Restrict multiple accounts per device.</p>
+                           </div>
+                           <button 
+                              onClick={() => updateSettings({ deviceLimitEnabled: !state.settings.deviceLimitEnabled })}
+                              className={`w-12 h-6 rounded-full transition-all relative ${state.settings.deviceLimitEnabled ? 'bg-blue-600' : 'bg-gray-700'}`}
+                           >
+                              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${state.settings.deviceLimitEnabled ? 'left-7' : 'left-1'}`} />
+                           </button>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                           <div>
+                              <p className="text-sm font-semibold text-gray-300">Max Accounts Per Device</p>
+                              <p className="text-xs text-gray-500 mt-1">Default is 3.</p>
+                           </div>
+                           <input 
+                              type="number" 
+                              value={state.settings.maxAccountsPerDevice || 3} 
+                              onChange={e => updateSettings({ maxAccountsPerDevice: parseInt(e.target.value) || 3 })}
+                              className="w-20 bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm text-white outline-none text-center"
+                           />
+                        </div>
+                        <button 
+                           onClick={() => {
+                              if (window.confirm("Are you sure you want to reset all device limit exemptions globally?")) {
+                                 adminActions.resetDeviceRestrictions();
+                              }
+                           }}
+                           className="w-full bg-red-600/20 text-red-500 hover:bg-red-600/30 py-3 rounded-xl text-sm font-bold transition-colors mt-2"
+                        >
+                           Reset All Device Exemptions
+                        </button>
+                     </div>
+
+                     {/* Advanced Profit Protection */}
+                     <div className="bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-lg space-y-4">
+                        <div className="flex items-center gap-3 border-b border-gray-800 pb-3">
+                           <ShieldCheck className="text-green-500" size={20} />
+                           <h3 className="text-base font-bold text-white">Advanced Profit Protection</h3>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                           <div>
+                              <p className="text-sm font-semibold text-gray-300">Daily Reward Budget</p>
+                              <p className="text-xs text-gray-500 mt-1">Auto-reduce rewards if budget reached.</p>
+                           </div>
+                           <input 
+                              type="number" 
+                              value={state.settings.dailyRewardBudget ?? 100000} 
+                              onChange={e => updateSettings({ dailyRewardBudget: parseInt(e.target.value) || 0 })}
+                              className="w-24 bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm text-white outline-none text-center"
+                           />
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                           <div>
+                              <p className="text-sm font-semibold text-gray-300">Reward Delay (ms)</p>
+                              <p className="text-xs text-gray-500 mt-1">Delay before crediting to stop auto-clickers.</p>
+                           </div>
+                           <input 
+                              type="number" 
+                              value={state.settings.rewardDelayMs ?? 2000} 
+                              onChange={e => updateSettings({ rewardDelayMs: parseInt(e.target.value) || 0 })}
+                              className="w-24 bg-gray-900 border border-gray-700 p-2 rounded-lg text-sm text-white outline-none text-center"
+                           />
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                           <div>
+                              <p className="text-sm font-semibold text-gray-300">Auto-Flag Withdrawals</p>
+                              <p className="text-xs text-gray-500 mt-1">Flag high-risk users automatically.</p>
+                           </div>
+                           <button 
+                              onClick={() => updateSettings({ autoFlagWithdrawals: !state.settings.autoFlagWithdrawals })}
+                              className={`w-12 h-6 rounded-full transition-all relative ${state.settings.autoFlagWithdrawals ? 'bg-blue-600' : 'bg-gray-700'}`}
+                           >
+                              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${state.settings.autoFlagWithdrawals ? 'left-7' : 'left-1'}`} />
+                           </button>
+                        </div>
+                     </div>
+
+                     {/* Device Management */}
+                     <div className="bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-lg space-y-4">
+                        <div className="flex items-center gap-3 border-b border-gray-800 pb-3">
+                           <Network className="text-purple-500" size={20} />
+                           <h3 className="text-base font-bold text-white">Device Management</h3>
+                        </div>
+                        <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
+                           {Object.entries(
+                              state.allUsers.reduce((acc, user) => {
+                                 if (!user.deviceId) return acc;
+                                 if (!acc[user.deviceId]) acc[user.deviceId] = { count: 0, lastActive: 0, users: [] };
+                                 acc[user.deviceId].count++;
+                                 acc[user.deviceId].users.push(user.name);
+                                 if ((user.lastActiveAt || 0) > acc[user.deviceId].lastActive) acc[user.deviceId].lastActive = user.lastActiveAt || 0;
+                                 return acc;
+                              }, {} as Record<string, { count: number, lastActive: number, users: string[] }>)
+                           ).sort((a, b) => (b[1] as any).count - (a[1] as any).count).map(([deviceId, data]: [string, any]) => (
+                              <div key={deviceId} className="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                                 <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                       <p className="text-xs font-mono text-gray-400 break-all">{deviceId}</p>
+                                       <p className="text-[10px] text-gray-500 mt-1">Last Active: {new Date(data.lastActive).toLocaleString()}</p>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${data.count > (state.settings.maxAccountsPerDevice || 3) ? 'bg-red-500/20 text-red-500' : 'bg-gray-800 text-gray-300'}`}>
+                                       {data.count} Accounts
+                                    </span>
+                                 </div>
+                                 <p className="text-xs text-gray-400 mb-3 truncate">Users: {data.users.join(', ')}</p>
+                                 <div className="flex gap-2">
+                                    <button 
+                                       onClick={() => adminActions.clearDeviceLimitForDevice(deviceId)}
+                                       disabled={state.settings.exemptDevices?.includes(deviceId)}
+                                       className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${state.settings.exemptDevices?.includes(deviceId) ? 'bg-green-600/20 text-green-500 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
+                                    >
+                                       {state.settings.exemptDevices?.includes(deviceId) ? 'Exempted' : 'Exempt Device'}
+                                    </button>
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+
+                     {/* Suspicious Activity Logs */}
+                     <div className="bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-lg space-y-4">
+                        <div className="flex items-center gap-3 border-b border-gray-800 pb-3">
+                           <ShieldAlert className="text-red-500" size={20} />
+                           <h3 className="text-base font-bold text-white">Suspicious Activity</h3>
+                        </div>
+                        <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
+                           {state.suspiciousActivityLogs?.length > 0 ? state.suspiciousActivityLogs.map(log => (
+                              <div key={log.id} className="p-3 bg-gray-950 rounded-xl border border-red-900/30">
+                                 <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-bold text-red-400">{log.reason}</span>
+                                    <span className="text-[10px] text-gray-500">{new Date(log.timestamp).toLocaleString()}</span>
+                                 </div>
+                                 <p className="text-xs text-white font-medium mb-1">{log.userName}</p>
+                                 <p className="text-[10px] text-gray-400">{log.details}</p>
+                                 <button 
+                                    onClick={() => { setActiveTab('users'); setViewingUserId(log.userId); }}
+                                    className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2 hover:text-blue-300 transition-colors"
+                                 >
+                                    Review User
+                                 </button>
+                              </div>
+                           )) : (
+                              <p className="text-sm text-gray-500 text-center py-4">No suspicious activity detected.</p>
+                           )}
                         </div>
                      </div>
                   </div>

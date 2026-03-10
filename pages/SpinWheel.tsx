@@ -145,8 +145,8 @@ const SpinWheel: React.FC = () => {
 
     setIsAdPending(true);
     // MANDATORY AD BEFORE EVERY CLAIM
-    playAd(() => {
-      const success = claimSpinReward(lastReward!);
+    playAd(async () => {
+      const success = await claimSpinReward(lastReward!);
       if (success) {
         playSound('collect');
         setLastReward(null);

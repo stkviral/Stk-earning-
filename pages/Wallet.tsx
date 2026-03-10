@@ -138,7 +138,7 @@ const TransactionItem: React.FC<{ tx: Transaction; onCancel?: (txId: string) => 
 };
 
 const Wallet: React.FC = () => {
-  const { state, withdraw, cancelWithdrawal, setActiveTab, updateUser } = useApp();
+  const { state, isDeviceLimitReached, withdraw, cancelWithdrawal, setActiveTab, updateUser } = useApp();
   const { currentUser, settings } = state;
   const [upiId, setUpiId] = useState(currentUser?.upiId || '');
   const [withdrawAmount, setWithdrawAmount] = useState<number | string>(500);
@@ -209,6 +209,10 @@ const Wallet: React.FC = () => {
 
   const handleWithdrawInitiate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDeviceLimitReached) {
+      alert("Device Limit Reached: You cannot withdraw coins from this device.");
+      return;
+    }
     if (!isUpiValid || cooldownRemaining || numAmount < minThreshold || numAmount > maxThreshold || currentUser.coins < numAmount) return;
     
     setIsProcessing(true);
