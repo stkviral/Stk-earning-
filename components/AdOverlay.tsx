@@ -6,9 +6,10 @@ interface AdOverlayProps {
   type: 'REWARD' | 'REQUIRED';
   onReward: () => void;
   onClose: () => void;
+  onError?: () => void;
 }
 
-const AdOverlay: React.FC<AdOverlayProps> = ({ type, onReward, onClose }) => {
+const AdOverlay: React.FC<AdOverlayProps> = ({ type, onReward, onClose, onError }) => {
   const [adState, setAdState] = useState<'LOADING' | 'PLAYING' | 'COMPLETED' | 'ERROR'>('LOADING');
   const [timeLeft, setTimeLeft] = useState(10); // 10-second rewarded ad
   const [canSkip, setCanSkip] = useState(false);
@@ -26,7 +27,11 @@ const AdOverlay: React.FC<AdOverlayProps> = ({ type, onReward, onClose }) => {
       // 5% chance of ad failing to load
       if (Math.random() < 0.05) {
         console.error(`[AdMob] Failed to load ad: ${ADMOB_AD_UNIT_ID}`);
-        setAdState('ERROR');
+        if (onError) {
+          onError();
+        } else {
+          setAdState('ERROR');
+        }
       } else {
         console.log(`[AdMob] Ad loaded successfully. Starting playback.`);
         setAdState('PLAYING');

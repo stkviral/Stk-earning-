@@ -71,6 +71,7 @@ export interface User {
   referredBy?: string;
   dailyEarned: number;
   lastResetTimestamp: number;
+  createdAt?: number;
   adsWatchedToday: number;
   lastAdTimestamp: number;
   dailyRewardClaimed: boolean;
@@ -102,6 +103,8 @@ export interface User {
   lastWithdrawalTimestamp?: number;
   hasCompletedOnboarding?: boolean;
   deviceLimitExempt?: boolean;
+  deviceLimitBlocked?: boolean;
+  customDeviceLimit?: number;
   rewardLimitExempt?: boolean;
   withdrawalFlagExempt?: boolean;
   fraudDetectionExempt?: boolean;
@@ -125,14 +128,20 @@ export interface AppSettings {
   spinRewards: number[];
   maxDailySpinsNormal: number;
   spinCooldownMinutes: number;
+  spinAdRequired: boolean;
   scratchRewards: number[];
   maxDailyScratchesNormal: number;
   scratchCooldownMinutes: number;
+  scratchAdRequired: boolean;
   scratchProbabilities: Record<string, number>;
   withdrawalFeeNormal: number;
   minWithdrawalCoins: number;
+  maxWithdrawalCoins: number;
+  manualWithdrawalApproval: boolean;
   withdrawalCooldownHours: number;
   maxDailyAds: number;
+  adCooldownMinutes: number;
+  videoAdRequired: boolean;
   dailyWithdrawalLimit: number;
   spinProbabilities: Record<string, number>;
   emergencyRewardReduction: number;
@@ -141,8 +150,11 @@ export interface AppSettings {
   maxAccountsPerDevice: number;
   exemptDevices: string[];
   dailyRewardBudget: number;
+  autoRewardBalancing: boolean;
   rewardDelayMs: number;
   autoFlagWithdrawals: boolean;
+  dailyBonusRewards: number[];
+  dailyBonusResetDays: number;
 }
 
 export interface AppState {

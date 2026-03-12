@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../App';
 import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, Activity, Flame, Sparkles, ZapOff, ShieldOff, AlertTriangle } from 'lucide-react';
-import { AD_GAP_MS } from '../types';
 
 const Videos: React.FC = () => {
   const { state, isDeviceLimitReached, getServerTime, playAd, addCoins, updateUser, logActivity } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [timeLeft, setTimeLeft] = useState(0);
+  const [adError, setAdError] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -15,7 +15,8 @@ const Videos: React.FC = () => {
     // Manage interval for reward video cooldown
     const interval = setInterval(() => {
       const now = getServerTime();
-      const diff = AD_GAP_MS - (now - currentUser.lastAdTimestamp);
+      const cooldownMs = settings.adCooldownMinutes * 60 * 1000;
+      const diff = cooldownMs - (now - currentUser.lastAdTimestamp);
       setTimeLeft(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
@@ -28,6 +29,7 @@ const Videos: React.FC = () => {
   const finalReward = Math.round(settings.adRewardCoins * multiplier);
 
   const handleWatchAd = () => {
+    setAdError(false);
     if (isDeviceLimitReached) {
       alert("Maximum accounts reached on this device");
       return;
@@ -47,8 +49,7 @@ const Videos: React.FC = () => {
       return;
     }
 
-    // playAd will instantly call the callback if settings.adsEnabled is false
-    playAd(() => {
+    const claimReward = () => {
       const success = addCoins(finalReward, 'Video Watch');
       if (success) {
         updateUser({
@@ -57,7 +58,17 @@ const Videos: React.FC = () => {
         });
         logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${finalReward} coins (Base: ${settings.adRewardCoins}, Multiplier: ${multiplier.toFixed(1)}x)`);
       }
-    }, 'REWARD', () => {});
+    };
+
+    const handleError = () => {
+      setAdError(true);
+    };
+
+    if (settings.videoAdRequired) {
+      playAd(claimReward, 'REWARD', () => {}, handleError);
+    } else {
+      claimReward();
+    }
   };
 
   const progress = (currentUser.adsWatchedToday / settings.maxDailyAds) * 100;
@@ -73,6 +84,35 @@ const Videos: React.FC = () => {
              <p className="text-xs font-medium text-red-100 leading-relaxed">
                Please disable your ad blocker to watch videos and earn rewards. Earning is currently suspended.
              </p>
+           </div>
+        </div>
+      )}
+
+      {adError && (
+        <div className="bg-orange-500 text-white p-4 rounded-2xl shadow-lg border-2 border-orange-400 flex items-start gap-3 relative z-20 animate-in slide-in-from-top-4">
+           <AlertTriangle className="text-white shrink-0 mt-0.5" size={24} />
+           <div className="space-y-2 w-full">
+             <h3 className="font-black text-sm uppercase tracking-wider">Ad Failed to Load</h3>
+             <p className="text-xs font-medium text-orange-100 leading-relaxed">
+               There was an issue playing the advertisement. Please check your connection and try again.
+             </p>
+             <div className="flex justify-end gap-2 mt-2">
+               <button 
+                 onClick={() => setAdError(false)}
+                 className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 rounded-lg text-xs font-bold transition-colors"
+               >
+                 Dismiss
+               </button>
+               <button 
+                 onClick={() => {
+                   setAdError(false);
+                   handleWatchAd();
+                 }}
+                 className="px-3 py-1.5 bg-white text-orange-600 hover:bg-orange-50 rounded-lg text-xs font-black transition-colors"
+               >
+                 Retry Video
+               </button>
+             </div>
            </div>
         </div>
       )}

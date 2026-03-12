@@ -34,7 +34,7 @@ interface AppContextType {
   claimSpinReward: (reward: number) => boolean;
   claimScratchReward: (reward: number) => boolean;
   claimDailyCheckIn: () => boolean;
-  playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void) => void;
+  playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
@@ -53,7 +53,8 @@ interface AppContextType {
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => void;
     setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => void;
     modifyCoins: (userId: string, amount: number, reason: string) => void;
-    resetCooldowns: (userId: string, type: 'SPIN' | 'ALL', reason: string) => void;
+    resetCooldowns: (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => void;
+    resetStreak: (userId: string, reason: string) => void;
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
     clearDeviceLimitForUser: (userId: string) => void;
@@ -88,14 +89,20 @@ const DEFAULT_SETTINGS: AppSettings = {
   spinRewards: [1, 2, 3, 5, 10],
   maxDailySpinsNormal: 50,
   spinCooldownMinutes: 0,
+  spinAdRequired: false,
   scratchRewards: [2, 4, 6, 8, 15],
   maxDailyScratchesNormal: 30,
   scratchCooldownMinutes: 0,
+  scratchAdRequired: false,
   scratchProbabilities: { "2": 40, "4": 30, "6": 20, "8": 9, "15": 1 },
   withdrawalFeeNormal: 0,
   minWithdrawalCoins: 1000,
+  maxWithdrawalCoins: 10000,
+  manualWithdrawalApproval: true,
   withdrawalCooldownHours: 24,
   maxDailyAds: 20,
+  adCooldownMinutes: 0,
+  videoAdRequired: false,
   dailyWithdrawalLimit: 5000,
   spinProbabilities: { "1": 40, "2": 30, "3": 20, "5": 9, "10": 1 },
   emergencyRewardReduction: 0,
@@ -104,18 +111,47 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxAccountsPerDevice: 3,
   exemptDevices: [],
   dailyRewardBudget: 100000,
+  autoRewardBalancing: false,
   rewardDelayMs: 2000,
-  autoFlagWithdrawals: true
+  autoFlagWithdrawals: true,
+  dailyBonusRewards: [5, 10, 15, 20, 25, 30, 50],
+  dailyBonusResetDays: 7
 };
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' }>(() => {
     const saved = localStorage.getItem('stk_app_state');
     const parsed = saved ? JSON.parse(saved) : null;
+
+    let allUsers = parsed?.allUsers || [];
+    if (parsed && parsed.allUserIds) {
+      allUsers = parsed.allUserIds.map((id: string) => {
+        const userStr = localStorage.getItem(`stk_user_${id}`);
+        const user = userStr ? JSON.parse(userStr) : null;
+        if (user && !user.createdAt) user.createdAt = user.lastResetTimestamp || Date.now();
+        return user;
+      }).filter(Boolean);
+    } else if (allUsers.length > 0) {
+      allUsers.forEach((user: User) => {
+        if (!user.createdAt) user.createdAt = user.lastResetTimestamp || Date.now();
+        localStorage.setItem(`stk_user_${user.id}`, JSON.stringify(user));
+      });
+    }
+
+    let currentUser = parsed?.currentUser || null;
+    if (parsed && parsed.currentUserId) {
+      const userStr = localStorage.getItem(`stk_user_${parsed.currentUserId}`);
+      currentUser = userStr ? JSON.parse(userStr) : null;
+      if (currentUser && !currentUser.createdAt) currentUser.createdAt = currentUser.lastResetTimestamp || Date.now();
+    } else if (currentUser) {
+      if (!currentUser.createdAt) currentUser.createdAt = currentUser.lastResetTimestamp || Date.now();
+      localStorage.setItem(`stk_user_${currentUser.id}`, JSON.stringify(currentUser));
+    }
+
     return {
-      currentUser: parsed?.currentUser || null,
-      allUsers: parsed?.allUsers || [],
-      isLoggedIn: !!parsed?.currentUser,
+      currentUser,
+      allUsers,
+      isLoggedIn: !!currentUser,
       logoUrl: parsed?.logoUrl || '',
       settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
       logs: parsed?.logs || [],
@@ -124,13 +160,13 @@ const App: React.FC = () => {
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       deviceClaims: parsed?.deviceClaims || {},
       isAdBlockerActive: false,
-      isAdminSession: parsed?.currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === parsed?.currentUser?.email),
+      isAdminSession: currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === currentUser?.email),
       theme: parsed?.theme || 'dark'
     };
   });
 
   const [activeTab, setActiveTab] = useState('home');
-  const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onComplete: () => void } | null>(null);
+  const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onReward: () => void; onClose: () => void; onError?: () => void } | null>(null);
   const lastRewardTimeRef = React.useRef<number>(0);
   const timeOffsetRef = React.useRef<number>(0);
 
@@ -236,7 +272,19 @@ const App: React.FC = () => {
   }, [checkAdBlocker]);
 
   useEffect(() => {
-    localStorage.setItem('stk_app_state', JSON.stringify(state));
+    const stateToSave = {
+      ...state,
+      allUserIds: state.allUsers.map(u => u.id),
+      currentUserId: state.currentUser?.id,
+      allUsers: undefined,
+      currentUser: undefined
+    };
+    
+    state.allUsers.forEach(user => {
+      localStorage.setItem(`stk_user_${user.id}`, JSON.stringify(user));
+    });
+    
+    localStorage.setItem('stk_app_state', JSON.stringify(stateToSave));
     if (state.theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -410,7 +458,7 @@ const App: React.FC = () => {
     return success;
   }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity, getServerTime]);
 
-  const playAd = useCallback((onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void) => {
+  const playAd = useCallback((onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => {
     if (state.currentUser?.status === UserStatus.SUSPENDED) {
       alert(`Account Suspended: ${state.currentUser?.statusReason || 'Violation of terms'}`);
       if (onClose) onClose();
@@ -452,6 +500,10 @@ const App: React.FC = () => {
         onClose: () => {
           if (onClose) onClose();
           setAdConfig(null);
+        },
+        onError: () => {
+          if (onError) onError();
+          setAdConfig(null);
         }
       });
     }, Math.random() * 1000 + 500);
@@ -473,8 +525,20 @@ const App: React.FC = () => {
 
   const login = (email: string, name: string, referralCode?: string) => {
     const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const persistentId = getPersistentDeviceId();
     let user = state.allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
     if (!user) {
+      // Check device limit for NEW accounts
+      if (!isAdmin && state.settings.deviceLimitEnabled && !state.settings.exemptDevices?.includes(persistentId)) {
+        const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
+        const limit = state.settings.maxAccountsPerDevice ?? 3;
+        if (accountsOnDevice >= limit) {
+          alert(`Device limit reached. You cannot create more than ${limit} accounts on this device.`);
+          return;
+        }
+      }
+
       user = {
         id: Math.random().toString(36).substring(2, 9),
         name,
@@ -486,6 +550,7 @@ const App: React.FC = () => {
         referredBy: referralCode,
         dailyEarned: 0,
         lastResetTimestamp: Date.now(),
+        createdAt: Date.now(),
         adsWatchedToday: 0,
         lastAdTimestamp: 0,
         dailyRewardClaimed: false,
@@ -501,7 +566,7 @@ const App: React.FC = () => {
         adsBlocked: false,
         transactions: [],
         referralHistory: [],
-        deviceId: getPersistentDeviceId(),
+        deviceId: persistentId,
         lastIp: '192.168.1.' + Math.floor(Math.random() * 255),
         riskScore: 0,
         earningVelocity: 0,
@@ -510,8 +575,15 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, allUsers: [...prev.allUsers, user!] }));
     } else {
       // Update existing user's device ID to the persistent one if it's different
-      const persistentId = getPersistentDeviceId();
       if (user.deviceId !== persistentId) {
+        if (!isAdmin && state.settings.deviceLimitEnabled && !state.settings.exemptDevices?.includes(persistentId) && !user.deviceLimitExempt) {
+          const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
+          const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+          if (accountsOnDevice >= limit) {
+            alert(`Device limit reached. You cannot log into this account on this device.`);
+            return;
+          }
+        }
         user.deviceId = persistentId;
         setState(prev => ({
           ...prev,
@@ -724,6 +796,17 @@ const App: React.FC = () => {
       });
       logAdminAction('RESET_COOLDOWN', userId, `Reset ${type} cooldown. Reason: ${reason}`);
     },
+    resetStreak: (userId: string, reason: string) => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => {
+          if (u.id !== userId) return u;
+          return { ...u, streakDays: 0, dailyRewardClaimed: false };
+        });
+        const updated = newAllUsers.find(u => u.id === userId);
+        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+      });
+      logAdminAction('RESET_STREAK', userId, `Reset daily streak. Reason: ${reason}`);
+    },
     updateUserSettings: (userId: string, updates: Partial<User>) => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, ...updates });
@@ -810,10 +893,24 @@ const App: React.FC = () => {
   const isDeviceLimitReached = React.useMemo(() => {
     if (!state.currentUser || !state.settings.deviceLimitEnabled) return false;
     if (state.isAdminSession || state.currentUser.deviceLimitExempt) return false;
+    if (state.currentUser.deviceLimitBlocked) return true;
     if (state.settings.exemptDevices?.includes(state.currentUser.deviceId)) return false;
     
-    const accountsOnDevice = state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId).length;
-    return accountsOnDevice > (state.settings.maxAccountsPerDevice || 3);
+    const usersOnDevice = state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId);
+    const limit = state.currentUser.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+    
+    if (usersOnDevice.length <= limit) return false;
+
+    // Sort users by creation time to ensure the oldest accounts are allowed and only the excess newer accounts are blocked.
+    const sortedUsers = [...usersOnDevice].sort((a, b) => {
+      const timeA = a.createdAt || 0;
+      const timeB = b.createdAt || 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return a.id.localeCompare(b.id);
+    });
+    const allowedUsers = sortedUsers.slice(0, limit);
+    
+    return !allowedUsers.some(u => u.id === state.currentUser?.id);
   }, [state.currentUser, state.settings, state.isAdminSession, state.allUsers]);
 
   return (
@@ -846,7 +943,7 @@ const App: React.FC = () => {
         {state.isLoggedIn && activeTab !== 'admin' && activeTab !== 'privacy' && !state.settings.maintenanceMode && (
           <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
-        {adConfig && <AdOverlay type={adConfig.type} onReward={adConfig.onReward} onClose={adConfig.onClose} />}
+        {adConfig && <AdOverlay type={adConfig.type} onReward={adConfig.onReward} onClose={adConfig.onClose} onError={adConfig.onError} />}
         <Onboarding />
       </div>
     </AppContext.Provider>

@@ -93,6 +93,7 @@ const SpinWheel: React.FC = () => {
       setIsWobbling(false);
       setSpinning(true);
       playSound('ignite');
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
       
       // Use probability weights to select reward
       let totalWeight = 0;
@@ -126,16 +127,21 @@ const SpinWheel: React.FC = () => {
       setTimeout(() => {
         setSpinning(false);
         playSound('complete');
-        setIsAdPending(true);
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         
-        // MANDATORY AD AFTER EVERY SPIN
-        playAd(() => {
+        const completeSpin = () => {
           setWinningSegmentIndex(segmentIndex);
           setLastReward(settings.spinRewards[segmentIndex]);
           setIsAdPending(false);
           logActivity(currentUser.id, currentUser.name, 'SPIN_RESULT', `Won ${settings.spinRewards[segmentIndex]} coins from wheel`);
-        }, 'REQUIRED', () => setIsAdPending(false));
-        
+        };
+
+        if (settings.spinAdRequired) {
+          setIsAdPending(true);
+          playAd(completeSpin, 'REQUIRED', () => setIsAdPending(false));
+        } else {
+          completeSpin();
+        }
       }, 5000); // Matched with the new CSS transition duration
     }, 600);
   };
@@ -143,9 +149,8 @@ const SpinWheel: React.FC = () => {
   const handleClaimReward = () => {
     if (lastReward === null || isAdBlockerActive || isAdPending) return;
 
-    setIsAdPending(true);
-    // MANDATORY AD BEFORE EVERY CLAIM
-    playAd(async () => {
+    const claim = async () => {
+      setIsAdPending(true);
       const success = await claimSpinReward(lastReward!);
       if (success) {
         playSound('collect');
@@ -153,7 +158,14 @@ const SpinWheel: React.FC = () => {
         setWinningSegmentIndex(null);
       }
       setIsAdPending(false);
-    }, 'REQUIRED', () => setIsAdPending(false));
+    };
+
+    if (settings.spinAdRequired) {
+      setIsAdPending(true);
+      playAd(claim, 'REQUIRED', () => setIsAdPending(false));
+    } else {
+      claim();
+    }
   };
 
   const handleUnlockExtraSpin = () => {

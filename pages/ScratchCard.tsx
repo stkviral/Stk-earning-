@@ -159,6 +159,9 @@ const ScratchCard: React.FC = () => {
     ctx.arc(x, y, 20, 0, Math.PI * 2);
     ctx.fill();
 
+    // Subtle haptic feedback while scratching (throttled by the browser usually, but we can just call it)
+    if (navigator.vibrate && Math.random() > 0.8) navigator.vibrate(5);
+
     calculateScratchedArea();
   };
 
@@ -188,6 +191,7 @@ const ScratchCard: React.FC = () => {
   const handleReveal = () => {
     setIsRevealed(true);
     playSound('complete');
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     
     // Clear the rest of the canvas
     const canvas = canvasRef.current;
@@ -196,20 +200,22 @@ const ScratchCard: React.FC = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    setIsAdPending(true);
-    // MANDATORY AD AFTER EVERY SCRATCH
-    playAd(() => {
-      setIsAdPending(false);
+    if (settings.scratchAdRequired) {
+      setIsAdPending(true);
+      playAd(() => {
+        setIsAdPending(false);
+        logActivity(currentUser.id, currentUser.name, 'SCRATCH_RESULT', `Won ${reward} coins from scratch card`);
+      }, 'REQUIRED', () => setIsAdPending(false));
+    } else {
       logActivity(currentUser.id, currentUser.name, 'SCRATCH_RESULT', `Won ${reward} coins from scratch card`);
-    }, 'REQUIRED', () => setIsAdPending(false));
+    }
   };
 
   const handleClaimReward = () => {
     if (reward === null || isAdBlockerActive || isAdPending) return;
 
-    setIsAdPending(true);
-    // MANDATORY AD BEFORE EVERY CLAIM
-    playAd(async () => {
+    const claim = async () => {
+      setIsAdPending(true);
       const success = await claimScratchReward(reward!);
       if (success) {
         playSound('collect');
@@ -217,7 +223,14 @@ const ScratchCard: React.FC = () => {
         setIsRevealed(false);
       }
       setIsAdPending(false);
-    }, 'REQUIRED', () => setIsAdPending(false));
+    };
+
+    if (settings.scratchAdRequired) {
+      setIsAdPending(true);
+      playAd(claim, 'REQUIRED', () => setIsAdPending(false));
+    } else {
+      claim();
+    }
   };
 
   const handleUnlockExtraScratch = () => {
@@ -283,7 +296,7 @@ const ScratchCard: React.FC = () => {
               <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Click below to get a new scratch card</p>
             </div>
           ) : (
-            <div ref={containerRef} className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30">
+            <div ref={containerRef} className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 transition-transform duration-300 ${isScratching ? 'scale-[0.98]' : 'scale-100'}`}>
               <div className="text-center">
                 <span className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter">{reward}</span>
                 <div className="flex items-center justify-center gap-1 mt-2 text-orange-500">
