@@ -22,6 +22,7 @@ import Header from './components/Header';
 import Onboarding from './components/Onboarding';
 import { ShieldOff, RefreshCw, Server, Ban } from 'lucide-react';
 import { BackendAI } from './geminiService';
+import { supabase } from './supabase';
 
 interface AppContextType {
   state: AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' };
@@ -60,6 +61,8 @@ interface AppContextType {
     clearDeviceLimitForUser: (userId: string) => void;
     clearDeviceLimitForDevice: (deviceId: string) => void;
     resetDeviceRestrictions: () => void;
+    unbindDeviceForUser: (userId: string) => void;
+    unbindAllDevices: () => void;
   }
 }
 
@@ -118,6 +121,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   dailyBonusResetDays: 7
 };
 
+const getPersistentDeviceId = () => {
+  let deviceId = localStorage.getItem('stk_device_id');
+  if (!deviceId) {
+    deviceId = 'DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    localStorage.setItem('stk_device_id', deviceId);
+  }
+  return deviceId;
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' }>(() => {
     const saved = localStorage.getItem('stk_app_state');
@@ -160,7 +172,7 @@ const App: React.FC = () => {
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       deviceClaims: parsed?.deviceClaims || {},
       isAdBlockerActive: false,
-      isAdminSession: currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === currentUser?.email),
+      isAdminSession: currentUser?.role === 'admin' || currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === currentUser?.email),
       theme: parsed?.theme || 'dark'
     };
   });
@@ -198,6 +210,19 @@ const App: React.FC = () => {
         ...updates, 
         lastActiveAt: Date.now() 
       };
+
+      // Sync account data to Supabase
+      const supabaseUpdates: any = {};
+      if (updates.coins !== undefined) supabaseUpdates.coins = updatedUser.coins;
+      if (updates.role !== undefined) supabaseUpdates.role = updatedUser.role;
+      if (updates.email !== undefined) supabaseUpdates.email = updatedUser.email;
+      
+      if (Object.keys(supabaseUpdates).length > 0) {
+        supabase.from('users').update(supabaseUpdates).eq('id', updatedUser.id).then(({ error }) => {
+          if (error) console.error("Failed to sync account data to Supabase", error);
+        });
+      }
+
       return {
         ...prev,
         currentUser: updatedUser,
@@ -514,19 +539,10 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
   }, []);
 
-  const getPersistentDeviceId = () => {
-    let deviceId = localStorage.getItem('stk_device_id');
-    if (!deviceId) {
-      deviceId = 'DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-      localStorage.setItem('stk_device_id', deviceId);
-    }
-    return deviceId;
-  };
-
-  const login = (email: string, name: string, referralCode?: string) => {
-    const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    const persistentId = getPersistentDeviceId();
+  const login = (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
     let user = state.allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const isAdmin = supabaseUser?.role === 'admin' || user?.role === 'admin' || email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const persistentId = getPersistentDeviceId();
     
     if (!user) {
       // Check device limit for NEW accounts
@@ -540,17 +556,18 @@ const App: React.FC = () => {
       }
 
       user = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: supabaseUser?.id || Math.random().toString(36).substring(2, 9),
         name,
         email,
+        role: supabaseUser?.role || 'user',
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-        coins: 0,
+        coins: supabaseUser?.coins || 0,
         tag: UserTag.NORMAL,
         referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
         referredBy: referralCode,
         dailyEarned: 0,
         lastResetTimestamp: Date.now(),
-        createdAt: Date.now(),
+        createdAt: supabaseUser?.created_at ? new Date(supabaseUser.created_at).getTime() : Date.now(),
         adsWatchedToday: 0,
         lastAdTimestamp: 0,
         dailyRewardClaimed: false,
@@ -574,14 +591,38 @@ const App: React.FC = () => {
       };
       setState(prev => ({ ...prev, allUsers: [...prev.allUsers, user!] }));
     } else {
+      // Update existing user's data from Supabase
+      let needsUpdate = false;
+      if (supabaseUser?.role && user.role !== supabaseUser.role) {
+        user.role = supabaseUser.role;
+        needsUpdate = true;
+      }
+      if (supabaseUser?.coins !== undefined && user.coins !== supabaseUser.coins) {
+        user.coins = supabaseUser.coins;
+        needsUpdate = true;
+      }
+      
+      if (needsUpdate) {
+        setState(prev => ({
+          ...prev,
+          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, role: user!.role, coins: user!.coins } : u)
+        }));
+      }
+
       // Update existing user's device ID to the persistent one if it's different
       if (user.deviceId !== persistentId) {
-        if (!isAdmin && state.settings.deviceLimitEnabled && !state.settings.exemptDevices?.includes(persistentId) && !user.deviceLimitExempt) {
-          const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
-          const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
-          if (accountsOnDevice >= limit) {
+        if (!isAdmin && state.settings.deviceLimitEnabled) {
+          if (user.deviceLimitBlocked) {
             alert(`Device limit reached. You cannot log into this account on this device.`);
             return;
+          }
+          if (!state.settings.exemptDevices?.includes(persistentId) && !user.deviceLimitExempt) {
+            const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
+            const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+            if (accountsOnDevice >= limit) {
+              alert(`Device limit reached. You cannot log into this account on this device.`);
+              return;
+            }
           }
         }
         user.deviceId = persistentId;
@@ -607,9 +648,57 @@ const App: React.FC = () => {
     } catch (e) {
       console.warn("Google logout failed", e);
     }
+    supabase.auth.signOut().catch(console.error);
     setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
     setActiveTab('home'); 
   };
+
+  const loginRef = React.useRef(login);
+  useEffect(() => {
+    loginRef.current = login;
+  }, [login]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { user } = session;
+        const email = user.email || '';
+        const name = user.user_metadata?.full_name || email.split('@')[0];
+        
+        // Check if user exists in Supabase
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        const deviceId = getPersistentDeviceId();
+
+        if (!existingUser) {
+          // Create new user in Supabase
+          const newUser = {
+            id: user.id,
+            email: email,
+            role: 'user',
+            coins: 0,
+            created_at: new Date().toISOString(),
+            device_id: deviceId
+          };
+          await supabase.from('users').insert([newUser]);
+          loginRef.current(email, name, undefined, newUser);
+        } else {
+          loginRef.current(email, name, undefined, existingUser);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
+        setActiveTab('home');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
   const toggleTheme = useCallback(() => {
     setState(prev => {
       return { ...prev, theme: prev.theme === 'light' ? 'dark' : 'light' };
@@ -617,7 +706,7 @@ const App: React.FC = () => {
   }, []);
 
   const calculateRiskScore = useCallback((user: User) => {
-    if (user.fraudDetectionExempt || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || state.adminUsers.some(a => a.email.toLowerCase() === user.email.toLowerCase())) return 0;
+    if (user.fraudDetectionExempt || user.role === 'admin' || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || state.adminUsers.some(a => a.email.toLowerCase() === user.email.toLowerCase())) return 0;
     let score = 0;
     
     // Check for shared Device ID
@@ -677,12 +766,6 @@ const App: React.FC = () => {
     const newTransactions = [tx, ...(state.currentUser.transactions || [])];
     updateUser({ coins: state.currentUser.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() });
     
-    // Also update allUsers
-    setState(prev => ({
-      ...prev,
-      allUsers: prev.allUsers.map(u => u.id === prev.currentUser!.id ? { ...u, coins: u.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() } : u)
-    }));
-    
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
     return null;
   };
@@ -708,12 +791,6 @@ const App: React.FC = () => {
       transactions: newTransactions,
       lastWithdrawalTimestamp: 0 // Reset cooldown
     });
-    
-    // Also update allUsers
-    setState(prev => ({
-      ...prev,
-      allUsers: prev.allUsers.map(u => u.id === prev.currentUser!.id ? { ...u, coins: u.coins + refundAmount, transactions: newTransactions, lastWithdrawalTimestamp: 0 } : u)
-    }));
 
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_CANCEL', `Cancelled withdrawal ${txId} and refunded ${refundAmount} coins`);
     return null;
@@ -733,7 +810,14 @@ const App: React.FC = () => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
           const tx = (u.transactions || []).find(t => t.id === txId);
-          return { ...u, coins: u.coins + (tx?.amount || 0), transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
+          const newCoins = u.coins + (tx?.amount || 0);
+          
+          // Sync to Supabase
+          supabase.from('users').update({ coins: newCoins }).eq('id', u.id).then(({ error }) => {
+            if (error) console.error("Failed to sync rejected withdrawal coins to Supabase", error);
+          });
+          
+          return { ...u, coins: newCoins, transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -769,7 +853,14 @@ const App: React.FC = () => {
             status: 'COMPLETED',
             timestamp: Date.now()
           };
-          return { ...u, coins: Math.max(0, u.coins + amount), transactions: [tx, ...(u.transactions || [])] };
+          const newCoins = Math.max(0, u.coins + amount);
+          
+          // Sync to Supabase
+          supabase.from('users').update({ coins: newCoins }).eq('id', u.id).then(({ error }) => {
+            if (error) console.error("Failed to sync admin coin adjustment to Supabase", error);
+          });
+          
+          return { ...u, coins: newCoins, transactions: [tx, ...(u.transactions || [])] };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -808,6 +899,18 @@ const App: React.FC = () => {
       logAdminAction('RESET_STREAK', userId, `Reset daily streak. Reason: ${reason}`);
     },
     updateUserSettings: (userId: string, updates: Partial<User>) => {
+      // Sync to Supabase
+      const supabaseUpdates: any = {};
+      if (updates.coins !== undefined) supabaseUpdates.coins = updates.coins;
+      if (updates.role !== undefined) supabaseUpdates.role = updates.role;
+      if (updates.email !== undefined) supabaseUpdates.email = updates.email;
+      
+      if (Object.keys(supabaseUpdates).length > 0) {
+        supabase.from('users').update(supabaseUpdates).eq('id', userId).then(({ error }) => {
+          if (error) console.error("Failed to sync admin user settings update to Supabase", error);
+        });
+      }
+
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, ...updates });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -838,10 +941,27 @@ const App: React.FC = () => {
     },
     resetDeviceRestrictions: () => {
       setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceLimitExempt: false }));
-        return { ...prev, allUsers: newAllUsers, settings: { ...prev.settings, exemptDevices: [] } };
+        const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: undefined }));
+        const newCurrentUser = prev.currentUser ? { ...prev.currentUser, deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: undefined } : null;
+        return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser, settings: { ...prev.settings, exemptDevices: [] } };
       });
       logAdminAction('DEVICE_LIMIT_RESET', 'SYSTEM', 'Reset all device limit exemptions globally');
+    },
+    unbindDeviceForUser: (userId: string) => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => u.id === userId ? { ...u, deviceId: undefined, deviceLimitBlocked: false } : u);
+        const newCurrentUser = prev.currentUser?.id === userId ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false } : prev.currentUser;
+        return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
+      });
+      logAdminAction('DEVICE_UNBIND', userId, 'Unbound device from user');
+    },
+    unbindAllDevices: () => {
+      setState(prev => {
+        const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceId: undefined, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: undefined }));
+        const newCurrentUser = prev.currentUser ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: undefined } : null;
+        return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser, settings: { ...prev.settings, exemptDevices: [] } };
+      });
+      logAdminAction('DEVICE_UNBIND_ALL', 'SYSTEM', 'Unbound all devices and reset limits globally');
     }
   };
 
@@ -869,7 +989,7 @@ const App: React.FC = () => {
       );
     }
     if (activeTab === 'admin') {
-      if (state.currentUser?.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      if (state.currentUser?.role !== 'admin' && state.currentUser?.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
         setActiveTab('home');
         return <Dashboard />;
       }

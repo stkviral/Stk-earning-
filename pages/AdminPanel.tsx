@@ -1018,17 +1018,30 @@ const AdminPanel: React.FC = () => {
                            </div>
                         </div>
 
-                        <button 
-                           onClick={() => {
-                              if (window.confirm("Are you sure you want to reset all device limit exemptions globally? This will re-apply limits to all previously exempted users.")) {
-                                 adminActions.resetDeviceRestrictions();
-                              }
-                           }}
-                           className="w-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-bold transition-all border border-red-500/20 flex items-center justify-center gap-2 mt-4"
-                        >
-                           <RefreshCw size={16} />
-                           Reset All Device Exemptions
-                        </button>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                           <button 
+                              onClick={() => {
+                                 if (window.confirm("Are you sure you want to reset all device limit exemptions globally? This will re-apply limits to all previously exempted users.")) {
+                                    adminActions.resetDeviceRestrictions();
+                                 }
+                              }}
+                              className="w-full bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 hover:text-orange-400 py-3.5 rounded-xl text-sm font-bold transition-all border border-orange-500/20 flex items-center justify-center gap-2"
+                           >
+                              <RefreshCw size={16} />
+                              Reset Exemptions
+                           </button>
+                           <button 
+                              onClick={() => {
+                                 if (window.confirm("EMERGENCY: Are you sure you want to unbind ALL devices? This will clear all device IDs and allow everyone to log in from new devices.")) {
+                                    adminActions.unbindAllDevices();
+                                 }
+                              }}
+                              className="w-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-bold transition-all border border-red-500/20 flex items-center justify-center gap-2"
+                           >
+                              <ShieldAlert size={16} />
+                              Reset All Device Limits
+                           </button>
+                        </div>
                      </div>
 
                      {/* Advanced Profit Protection */}
@@ -1117,7 +1130,9 @@ const AdminPanel: React.FC = () => {
                         <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
                            {state.allUsers.filter(u => 
                               searchTerm && ((u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                              (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
+                              (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              (u.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              (u.deviceId || '').toLowerCase().includes(searchTerm.toLowerCase()))
                            ).slice(0, 10).map(u => (
                               <div key={u.id} className="p-4 bg-gray-950 rounded-xl border border-gray-800 flex flex-col gap-4">
                                  <div className="flex items-center justify-between">
@@ -1126,11 +1141,20 @@ const AdminPanel: React.FC = () => {
                                        <div>
                                           <p className="text-sm font-bold text-white">{u.name}</p>
                                           <p className="text-xs text-gray-500">{u.email}</p>
+                                          <p className="text-[10px] text-gray-600 font-mono mt-0.5">ID: {u.id}</p>
                                        </div>
                                     </div>
                                     <div className="text-right">
                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Device ID</p>
                                        <p className="text-xs font-mono text-gray-400">{u.deviceId || 'N/A'}</p>
+                                       {u.deviceId && (
+                                          <button 
+                                             onClick={() => adminActions.unbindDeviceForUser(u.id)}
+                                             className="mt-1 px-2 py-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded text-[10px] font-bold transition-colors"
+                                          >
+                                             Unbind Device
+                                          </button>
+                                       )}
                                     </div>
                                  </div>
                                  

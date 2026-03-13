@@ -74,7 +74,7 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
               </span>
             </div>
           )}
-          {currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (
+          {(currentUser?.role === 'admin' || currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) && (
             <button 
               onClick={() => { playSound('tap'); setActiveTab('admin'); }}
               className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-90 text-gray-600 dark:text-gray-300"

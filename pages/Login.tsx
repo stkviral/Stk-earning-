@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Mail, Hash, ShieldCheck, ShieldAlert, Sparkles, UserCheck, Facebook, Send, Lock, User, ArrowRight } from 'lucide-react';
 import { useApp } from '../App';
+import { supabase } from '../supabase';
 
 interface LoginProps {
   onLogin: (email: string, name: string, referralCode?: string) => void;
@@ -39,70 +40,30 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     if (isLoggingIn) return;
-    
-    if (!window.google) {
-      alert("Google Sign-In is not loaded yet. Please wait a moment.");
-      return;
-    }
-
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || clientId === 'your_google_client_id_here') {
-      alert("Google Client ID is not configured. Please set VITE_GOOGLE_CLIENT_ID in your environment variables.");
-      return;
-    }
-
     setIsLoggingIn(true);
 
     try {
-      // Use the Token Client flow which allows forcing the account selection prompt
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-        prompt: 'select_account', // This forces the account chooser every time
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse.error) {
-            setIsLoggingIn(false);
-            console.error("Google Login Error:", tokenResponse.error);
-            if (tokenResponse.error !== 'access_denied') {
-              alert(`Login Error: ${tokenResponse.error}`);
-            }
-            return;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
           }
-
-          if (tokenResponse.access_token) {
-            try {
-              // Fetch user info using the access token
-              const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-              });
-              
-              if (!userInfoResponse.ok) {
-                throw new Error('Failed to fetch user info');
-              }
-
-              const userInfo = await userInfoResponse.json();
-              
-              if (userInfo.email) {
-                onLogin(userInfo.email, userInfo.name || 'User', referralCode);
-              } else {
-                alert("Failed to extract email from Google profile.");
-              }
-            } catch (err) {
-              console.error("Error fetching user info:", err);
-              alert("An error occurred while retrieving your profile.");
-            } finally {
-              setIsLoggingIn(false);
-            }
-          }
-        },
+        }
       });
 
-      // Request the token, which triggers the popup with account selection
-      client.requestAccessToken();
+      if (error) {
+        console.error("Supabase Google Login Error:", error);
+        alert(`Login Error: ${error.message}`);
+        setIsLoggingIn(false);
+      }
+      // The redirect will happen automatically if successful
     } catch (err) {
-      console.error("Google OAuth2 Initialization Error:", err);
+      console.error("Supabase OAuth2 Initialization Error:", err);
       setIsLoggingIn(false);
       alert("Failed to initialize Google Sign-In.");
     }
