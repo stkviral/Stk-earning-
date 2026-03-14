@@ -49,8 +49,8 @@ const Videos: React.FC = () => {
       return;
     }
 
-    const claimReward = () => {
-      const success = addCoins(finalReward, 'Video Watch');
+    const claimReward = async () => {
+      const success = await addCoins(finalReward, 'Video Watch');
       if (success) {
         updateUser({
           adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,

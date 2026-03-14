@@ -23,7 +23,7 @@ import {
 import { COIN_TO_INR_RATE, Transaction } from '../types';
 import { playSound } from '../audioUtils';
 
-type TransactionFilter = 'ALL' | 'EARN' | 'WITHDRAW';
+type TransactionFilter = 'ALL' | 'EARN' | 'WITHDRAWAL';
 
 const TechGrid: React.FC = () => (
   <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden z-0">
@@ -47,7 +47,7 @@ const FloatingParticle: React.FC<{ index: number }> = ({ index }) => {
 const TransactionItem: React.FC<{ tx: Transaction; onCancel?: (txId: string) => void }> = ({ tx, onCancel }) => {
   const [showDetails, setShowDetails] = useState(false);
 
-  const isWithdraw = tx.type === 'WITHDRAW' || (tx.type === 'ADJUST' && tx.amount < 0);
+  const isWithdraw = tx.type === 'WITHDRAWAL' || (tx.type === 'ADJUST' && tx.amount < 0);
   const isCompleted = tx.status === 'COMPLETED';
   const isPending = tx.status === 'PENDING';
   const isRejected = tx.status === 'REJECTED';
@@ -218,7 +218,7 @@ const Wallet: React.FC = () => {
     setIsProcessing(true);
     playSound('ignite');
     await new Promise(resolve => setTimeout(resolve, 1500));
-    const error = withdraw(upiId, numAmount);
+    const error = await withdraw(upiId, numAmount);
     if (error) {
       alert(error);
     } else {
@@ -237,7 +237,7 @@ const Wallet: React.FC = () => {
     return [...(currentUser.transactions || [])]
       .filter(tx => {
         if (filter === 'ALL') return true;
-        if (filter === 'EARN') return tx.type !== 'WITHDRAW' && tx.amount > 0;
+        if (filter === 'EARN') return tx.type !== 'WITHDRAWAL' && tx.amount > 0;
         return tx.type === filter;
       })
       .sort((a, b) => b.timestamp - a.timestamp)
@@ -334,7 +334,7 @@ const Wallet: React.FC = () => {
             Recent Activity
           </h3>
           <div className="flex gap-2">
-            {(['ALL', 'EARN', 'WITHDRAW'] as TransactionFilter[]).map(f => (
+            {(['ALL', 'EARN', 'WITHDRAWAL'] as TransactionFilter[]).map(f => (
               <button 
                 key={f} 
                 onClick={() => { playSound('tap'); setFilter(f); }}
@@ -359,8 +359,8 @@ const Wallet: React.FC = () => {
               <TransactionItem 
                 key={tx.id} 
                 tx={tx} 
-                onCancel={(txId) => {
-                  const error = cancelWithdrawal(txId);
+                onCancel={async (txId) => {
+                  const error = await cancelWithdrawal(txId);
                   if (error) alert(error);
                   else alert("Withdrawal cancelled successfully.");
                 }} 

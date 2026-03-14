@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
   
   const canClaim = hasWatchedAd && hasActivity && !isDeviceClaimedToday && !isDeviceLimitReached;
 
-  const handleClaimDailyBonus = () => {
+  const handleClaimDailyBonus = async () => {
     if (isDeviceLimitReached) {
       alert("Maximum accounts reached on this device");
       return;
@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
       return;
     }
     
-    claimDailyCheckIn();
+    await claimDailyCheckIn();
   };
 
   return (

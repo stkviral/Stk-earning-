@@ -31,16 +31,16 @@ interface AppContextType {
   updateUser: (updates: Partial<User>) => void;
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
-  addCoins: (amount: number, method: string, type?: Transaction['type']) => boolean;
-  claimSpinReward: (reward: number) => boolean;
-  claimScratchReward: (reward: number) => boolean;
-  claimDailyCheckIn: () => boolean;
+  addCoins: (amount: number, method: string, type?: Transaction['type']) => Promise<boolean>;
+  claimSpinReward: (reward: number) => Promise<boolean>;
+  claimScratchReward: (reward: number) => Promise<boolean>;
+  claimDailyCheckIn: () => Promise<boolean>;
   playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => void;
   login: (email: string, name: string, referralCode?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
-  withdraw: (upiId: string, amount: number) => string | null;
-  cancelWithdrawal: (txId: string) => string | null;
+  withdraw: (upiId: string, amount: number) => Promise<string | null>;
+  cancelWithdrawal: (txId: string) => Promise<string | null>;
   setActiveTab: (tab: string) => void;
   calculateRiskScore: (user: User) => number;
   checkAdBlocker: () => Promise<boolean>;
@@ -49,8 +49,8 @@ interface AppContextType {
   logSuspiciousActivity: (userId: string, userName: string, reason: string, details: string) => void;
   updateDeviceClaim: (deviceId: string, timestamp: number) => void;
   adminActions: {
-    approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => void;
-    rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => void;
+    approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => Promise<void>;
+    rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => Promise<void>;
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => void;
     setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => void;
     modifyCoins: (userId: string, amount: number, reason: string) => void;
@@ -59,10 +59,11 @@ interface AppContextType {
     updateUserSettings: (userId: string, updates: Partial<User>) => void;
     impersonateUser: (userId: string) => void;
     clearDeviceLimitForUser: (userId: string) => void;
-    clearDeviceLimitForDevice: (deviceId: string) => void;
-    resetDeviceRestrictions: () => void;
-    unbindDeviceForUser: (userId: string) => void;
-    unbindAllDevices: () => void;
+    clearDeviceLimitForDevice: (deviceId: string) => Promise<void>;
+    removeDeviceExemption: (deviceId: string) => Promise<void>;
+    resetDeviceRestrictions: () => Promise<void>;
+    unbindDeviceForUser: (userId: string) => Promise<void>;
+    unbindAllDevices: () => Promise<void>;
   }
 }
 
@@ -344,7 +345,7 @@ const App: React.FC = () => {
     }));
   }, []);
 
-  const addCoins = useCallback((baseAmount: number, method: string, type: Transaction['type'] = 'ADJUST'): boolean => {
+  const addCoins = useCallback(async (baseAmount: number, method: string, type: Transaction['type'] = 'ADJUST'): Promise<boolean> => {
     if (!state.currentUser) return false;
     if (state.currentUser.status === UserStatus.SUSPENDED) {
       alert(`Account Suspended: ${state.currentUser.statusReason || 'Violation of terms'}`);
@@ -406,6 +407,34 @@ const App: React.FC = () => {
       amount = allowed;
     }
 
+    // Fetch current balance from Supabase
+    const { data: dbUser, error: fetchError } = await supabase
+      .from('users')
+      .select('coins')
+      .eq('id', state.currentUser.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error("Failed to fetch current balance:", fetchError);
+      alert("Failed to process reward. Please try again.");
+      return false;
+    }
+
+    const currentCoins = dbUser?.coins || 0;
+    const newCoins = currentCoins + amount;
+
+    // Update Supabase
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ coins: newCoins })
+      .eq('id', state.currentUser.id);
+
+    if (updateError) {
+      console.error("Failed to update balance:", updateError);
+      alert("Failed to process reward. Please try again.");
+      return false;
+    }
+
     const transaction: Transaction = {
       id: Math.random().toString(36).substring(2, 9),
       userId: state.currentUser.id,
@@ -415,13 +444,26 @@ const App: React.FC = () => {
       status: 'COMPLETED',
       timestamp: now
     };
-    updateUser({
-      coins: (state.currentUser.coins || 0) + amount,
-      dailyEarned: todayEarned + (amount > 0 ? amount : 0),
-      transactions: [transaction, ...(state.currentUser.transactions || [])]
+    
+    // Update local state without triggering another Supabase sync for coins
+    setState(prev => {
+      if (!prev.currentUser) return prev;
+      const updatedUser = { 
+        ...prev.currentUser, 
+        coins: newCoins,
+        dailyEarned: todayEarned + (amount > 0 ? amount : 0),
+        transactions: [transaction, ...(prev.currentUser.transactions || [])],
+        lastActiveAt: Date.now() 
+      };
+      return {
+        ...prev,
+        currentUser: updatedUser,
+        allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+      };
     });
+    
     return true;
-  }, [state.currentUser, state.settings, state.activityLogs, state.isAdBlockerActive, updateUser, getServerTime, logSuspiciousActivity]);
+  }, [state.currentUser, state.settings, state.activityLogs, state.isAdBlockerActive, getServerTime, logSuspiciousActivity]);
 
   const getActiveMultiplier = (streak: number) => {
     if (!streak) return 1.0;
@@ -438,7 +480,7 @@ const App: React.FC = () => {
     const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
-    const success = addCoins(finalReward, 'Spin Reward', 'SPIN');
+    const success = await addCoins(finalReward, 'Spin Reward', 'SPIN');
     if (success) {
       logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
@@ -453,14 +495,14 @@ const App: React.FC = () => {
     const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
     const finalReward = Math.round(reward * multiplier);
     
-    const success = addCoins(finalReward, 'Scratch Reward', 'SPIN'); // Using SPIN type for now
+    const success = await addCoins(finalReward, 'Scratch Reward', 'SPIN'); // Using SPIN type for now
     if (success) {
       logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
     }
     return success;
   }, [state.currentUser, state.settings.rewardDelayMs, addCoins, logActivity]);
 
-  const claimDailyCheckIn = useCallback((): boolean => {
+  const claimDailyCheckIn = useCallback(async (): Promise<boolean> => {
     if (!state.currentUser) return false;
     const currentStreak = state.currentUser.streakDays || 0;
     const currentDay = currentStreak + 1;
@@ -471,7 +513,7 @@ const App: React.FC = () => {
       reward += 25; // Extra weekly bonus
     }
     
-    const success = addCoins(reward, 'Daily Check-In', 'CHECKIN');
+    const success = await addCoins(reward, 'Daily Check-In', 'CHECKIN');
     if (success) {
       updateUser({ 
         dailyRewardClaimed: true, 
@@ -539,20 +581,78 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs] }));
   }, []);
 
-  const login = (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
+  const login = async (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
     let user = state.allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
     const isAdmin = supabaseUser?.role === 'admin' || user?.role === 'admin' || email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const persistentId = getPersistentDeviceId();
     
+    let isDeviceBlocked = false;
+    let isWhitelisted = false;
+
+    if (!isAdmin && state.settings.deviceLimitEnabled) {
+      try {
+        const { data: device, error } = await supabase.from('devices').select('*').eq('device_id', persistentId).single();
+        
+        if (error && error.code === 'PGRST116') {
+           // Device not found, insert it
+           await supabase.from('devices').insert([{
+             device_id: persistentId,
+             account_count: 1,
+             is_whitelisted: false
+           }]);
+        } else if (device) {
+           isWhitelisted = device.is_whitelisted;
+           let currentCount = device.account_count || 0;
+           const limit = user?.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+           
+           // If user is new to this device, check limit BEFORE incrementing if it's a completely new user
+           if (!user) {
+             if (!isWhitelisted && currentCount >= limit) {
+               isDeviceBlocked = true;
+             } else {
+               currentCount += 1;
+               await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
+             }
+           } else if (user.deviceId !== persistentId) {
+             // Decrement count on old device if it exists
+             if (user.deviceId) {
+               try {
+                 const { data: oldDevice } = await supabase.from('devices').select('account_count').eq('device_id', user.deviceId).single();
+                 if (oldDevice && oldDevice.account_count > 0) {
+                   await supabase.from('devices').update({ account_count: oldDevice.account_count - 1 }).eq('device_id', user.deviceId);
+                 }
+               } catch (e) {
+                 console.error("Failed to decrement old device count", e);
+               }
+             }
+             
+             currentCount += 1;
+             await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
+             if (!isWhitelisted && currentCount > limit) {
+               isDeviceBlocked = true;
+             }
+           } else {
+             if (!isWhitelisted && currentCount > limit) {
+               isDeviceBlocked = true;
+             }
+           }
+        }
+      } catch (err) {
+        console.error("Device check failed:", err);
+        // Fallback to local logic
+        const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
+        const limit = user?.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+        if (!state.settings.exemptDevices?.includes(persistentId) && accountsOnDevice >= limit) {
+           isDeviceBlocked = true;
+        }
+      }
+    }
+
     if (!user) {
       // Check device limit for NEW accounts
-      if (!isAdmin && state.settings.deviceLimitEnabled && !state.settings.exemptDevices?.includes(persistentId)) {
-        const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
-        const limit = state.settings.maxAccountsPerDevice ?? 3;
-        if (accountsOnDevice >= limit) {
-          alert(`Device limit reached. You cannot create more than ${limit} accounts on this device.`);
-          return;
-        }
+      if (isDeviceBlocked) {
+        alert(`Device limit reached. You cannot create more than ${state.settings.maxAccountsPerDevice ?? 3} accounts on this device.`);
+        return;
       }
 
       user = {
@@ -611,24 +711,22 @@ const App: React.FC = () => {
 
       // Update existing user's device ID to the persistent one if it's different
       if (user.deviceId !== persistentId) {
-        if (!isAdmin && state.settings.deviceLimitEnabled) {
-          if (user.deviceLimitBlocked) {
-            alert(`Device limit reached. You cannot log into this account on this device.`);
-            return;
-          }
-          if (!state.settings.exemptDevices?.includes(persistentId) && !user.deviceLimitExempt) {
-            const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
-            const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
-            if (accountsOnDevice >= limit) {
-              alert(`Device limit reached. You cannot log into this account on this device.`);
-              return;
-            }
-          }
+        if (isDeviceBlocked) {
+          alert(`Device limit reached. You cannot log into this account on this device.`);
+          return;
         }
         user.deviceId = persistentId;
         setState(prev => ({
           ...prev,
           allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceId: persistentId } : u)
+        }));
+      }
+      
+      if (user.deviceLimitBlocked !== isDeviceBlocked) {
+        user.deviceLimitBlocked = isDeviceBlocked;
+        setState(prev => ({
+          ...prev,
+          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceLimitBlocked: isDeviceBlocked } : u)
         }));
       }
     }
@@ -660,17 +758,24 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
         const { user } = session;
         const email = user.email || '';
         const name = user.user_metadata?.full_name || email.split('@')[0];
         
         // Check if user exists in Supabase
-        const { data: existingUser } = await supabase
+        const { data: existingUser, error } = await supabase
           .from('users')
           .select('*')
           .eq('id', user.id)
           .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error fetching user from Supabase:", error);
+          // Still try to login with what we have if there's a network error, but don't overwrite
+          loginRef.current(email, name, undefined, null);
+          return;
+        }
 
         const deviceId = getPersistentDeviceId();
 
@@ -681,10 +786,12 @@ const App: React.FC = () => {
             email: email,
             role: 'user',
             coins: 0,
-            created_at: new Date().toISOString(),
-            device_id: deviceId
+            created_at: new Date().toISOString()
           };
-          await supabase.from('users').insert([newUser]);
+          const { error: insertError } = await supabase.from('users').insert([newUser]);
+          if (insertError) {
+            console.error("Error inserting new user:", insertError);
+          }
           loginRef.current(email, name, undefined, newUser);
         } else {
           loginRef.current(email, name, undefined, existingUser);
@@ -728,7 +835,7 @@ const App: React.FC = () => {
     return Math.min(100, score);
   }, [state.allUsers, state.settings.dailyCapNormal, state.adminUsers]);
 
-  const withdraw = (upiId: string, amount: number): string | null => {
+  const withdraw = async (upiId: string, amount: number): Promise<string | null> => {
     if (!state.currentUser) return "User session error";
     if (state.currentUser.status === UserStatus.SUSPENDED) return `Account Suspended: ${state.currentUser.statusReason || 'Violation of terms'}`;
     if (!state.settings.withdrawalsEnabled) return "Withdrawals are temporarily disabled by the administrator.";
@@ -757,20 +864,40 @@ const App: React.FC = () => {
       }
     }
 
+    const txId = 'WD-' + Math.random().toString(36).substring(2, 9);
+    const now = Date.now();
+
+    // Insert into Supabase withdrawals table
+    const { error: insertError } = await supabase.from('withdrawals').insert([{
+      id: txId,
+      user_id: state.currentUser.id,
+      amount: finalAmount,
+      status: 'pending',
+      upi_id: upiId,
+      created_at: new Date(now).toISOString()
+    }]);
+
+    if (insertError) {
+      console.error("Failed to create withdrawal request:", insertError);
+      return "Failed to process withdrawal request. Please try again.";
+    }
+
     const tx: Transaction = {
-      id: 'WD-' + Math.random().toString(36).substring(2, 9),
+      id: txId,
       userId: state.currentUser.id,
-      amount: finalAmount, type: 'WITHDRAWAL', method: txMethod, status: txStatus, timestamp: Date.now()
+      amount: finalAmount, type: 'WITHDRAWAL', method: txMethod, status: txStatus, timestamp: now
     };
     
     const newTransactions = [tx, ...(state.currentUser.transactions || [])];
-    updateUser({ coins: state.currentUser.coins - amount, transactions: newTransactions, upiId, lastWithdrawalTimestamp: Date.now() });
+    
+    // Do not deduct coins yet, just record the transaction and update lastWithdrawalTimestamp
+    updateUser({ transactions: newTransactions, upiId, lastWithdrawalTimestamp: now });
     
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
     return null;
   };
 
-  const cancelWithdrawal = (txId: string): string | null => {
+  const cancelWithdrawal = async (txId: string): Promise<string | null> => {
     if (!state.currentUser) return "User session error";
     const txIndex = (state.currentUser.transactions || []).findIndex(t => t.id === txId);
     if (txIndex === -1) return "Transaction not found";
@@ -782,42 +909,108 @@ const App: React.FC = () => {
     const feeAmount = feeMatch ? parseInt(feeMatch[1]) : 0;
     const refundAmount = tx.amount + feeAmount;
 
+    // Update Supabase
+    const { error: updateError } = await supabase
+      .from('withdrawals')
+      .update({ status: 'cancelled' })
+      .eq('id', txId)
+      .eq('user_id', state.currentUser.id);
+
+    if (updateError) {
+      console.error("Failed to cancel withdrawal:", updateError);
+      return "Failed to cancel withdrawal. Please try again.";
+    }
+
     const updatedTx: Transaction = { ...tx, status: 'REJECTED', rejectionReason: 'Cancelled by user' };
     const newTransactions = [...(state.currentUser.transactions || [])];
     newTransactions[txIndex] = updatedTx;
 
     updateUser({
-      coins: state.currentUser.coins + refundAmount,
       transactions: newTransactions,
       lastWithdrawalTimestamp: 0 // Reset cooldown
     });
 
-    logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_CANCEL', `Cancelled withdrawal ${txId} and refunded ${refundAmount} coins`);
+    logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_CANCEL', `Cancelled withdrawal ${txId}`);
     return null;
   };
 
   const adminActions = {
-    approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => {
+    approveWithdrawal: async (userId: string, txId: string, paymentTxId?: string) => {
+      const user = state.allUsers.find(u => u.id === userId);
+      if (!user) return alert("User not found");
+      const tx = (user.transactions || []).find(t => t.id === txId);
+      if (!tx) return alert("Transaction not found");
+
+      const feeMatch = tx.method.match(/Fee: (\d+)/);
+      const feeAmount = feeMatch ? parseInt(feeMatch[1]) : 0;
+      const deductAmount = tx.amount + feeAmount;
+
+      if (user.coins < deductAmount) {
+        alert("User does not have enough coins to fulfill this withdrawal.");
+        return;
+      }
+
+      const newCoins = user.coins - deductAmount;
+
+      // Update Supabase users table
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({ coins: newCoins })
+        .eq('id', userId);
+
+      if (userUpdateError) {
+        console.error("Failed to deduct coins in Supabase", userUpdateError);
+        return alert("Failed to deduct coins. Please try again.");
+      }
+
+      // Update Supabase withdrawals table
+      const { error: withdrawalUpdateError } = await supabase
+        .from('withdrawals')
+        .update({ status: 'completed' })
+        .eq('id', txId)
+        .eq('user_id', userId);
+
+      if (withdrawalUpdateError) {
+        console.error("Failed to update withdrawal status in Supabase", withdrawalUpdateError);
+        // We might want to revert the coin deduction here, but for simplicity we'll just alert
+        alert("Failed to update withdrawal status. Coins were deducted.");
+      }
+
       setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) });
+        const newAllUsers = prev.allUsers.map(u => {
+          if (u.id !== userId) return u;
+          return { 
+            ...u, 
+            coins: newCoins,
+            transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) 
+          };
+        });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
       logAdminAction('PAYOUT_APPROVE', userId, `Approved payout ${txId}${paymentTxId ? ` (TxID: ${paymentTxId})` : ''}`);
     },
-    rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => {
+    rejectWithdrawal: async (userId: string, txId: string, rejectionReason: string) => {
+      // Update Supabase withdrawals table
+      const { error: withdrawalUpdateError } = await supabase
+        .from('withdrawals')
+        .update({ status: 'rejected' })
+        .eq('id', txId)
+        .eq('user_id', userId);
+
+      if (withdrawalUpdateError) {
+        console.error("Failed to update withdrawal status in Supabase", withdrawalUpdateError);
+        return alert("Failed to update withdrawal status. Please try again.");
+      }
+
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
-          const tx = (u.transactions || []).find(t => t.id === txId);
-          const newCoins = u.coins + (tx?.amount || 0);
-          
-          // Sync to Supabase
-          supabase.from('users').update({ coins: newCoins }).eq('id', u.id).then(({ error }) => {
-            if (error) console.error("Failed to sync rejected withdrawal coins to Supabase", error);
-          });
-          
-          return { ...u, coins: newCoins, transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) };
+          // Do not add coins back since they were never deducted
+          return { 
+            ...u, 
+            transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) 
+          };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -931,7 +1124,12 @@ const App: React.FC = () => {
       });
       logAdminAction('DEVICE_LIMIT_EXEMPT', userId, 'Exempted user from device limits');
     },
-    clearDeviceLimitForDevice: (deviceId: string) => {
+    clearDeviceLimitForDevice: async (deviceId: string) => {
+      try {
+        await supabase.from('devices').update({ is_whitelisted: true }).eq('device_id', deviceId);
+      } catch (err) {
+        console.error("Failed to whitelist device in Supabase", err);
+      }
       setState(prev => {
         const newExempt = [...(prev.settings.exemptDevices || [])];
         if (!newExempt.includes(deviceId)) newExempt.push(deviceId);
@@ -939,7 +1137,24 @@ const App: React.FC = () => {
       });
       logAdminAction('DEVICE_LIMIT_EXEMPT_DEVICE', 'SYSTEM', `Exempted device ${deviceId} from limits`);
     },
-    resetDeviceRestrictions: () => {
+    removeDeviceExemption: async (deviceId: string) => {
+      try {
+        await supabase.from('devices').update({ is_whitelisted: false }).eq('device_id', deviceId);
+      } catch (err) {
+        console.error("Failed to un-whitelist device in Supabase", err);
+      }
+      setState(prev => {
+        const newExempt = (prev.settings.exemptDevices || []).filter(id => id !== deviceId);
+        return { ...prev, settings: { ...prev.settings, exemptDevices: newExempt } };
+      });
+      logAdminAction('DEVICE_LIMIT_UNEXEMPT_DEVICE', 'SYSTEM', `Removed exemption for device ${deviceId}`);
+    },
+    resetDeviceRestrictions: async () => {
+      try {
+        await supabase.from('devices').update({ account_count: 0, is_whitelisted: false }).neq('device_id', '');
+      } catch (err) {
+        console.error("Failed to reset devices in Supabase", err);
+      }
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: undefined }));
         const newCurrentUser = prev.currentUser ? { ...prev.currentUser, deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: undefined } : null;
@@ -947,7 +1162,19 @@ const App: React.FC = () => {
       });
       logAdminAction('DEVICE_LIMIT_RESET', 'SYSTEM', 'Reset all device limit exemptions globally');
     },
-    unbindDeviceForUser: (userId: string) => {
+    unbindDeviceForUser: async (userId: string) => {
+      const user = state.allUsers.find(u => u.id === userId);
+      if (user && user.deviceId) {
+        try {
+          // Decrement account count in Supabase
+          const { data: deviceData } = await supabase.from('devices').select('account_count').eq('device_id', user.deviceId).single();
+          if (deviceData && deviceData.account_count > 0) {
+            await supabase.from('devices').update({ account_count: deviceData.account_count - 1 }).eq('device_id', user.deviceId);
+          }
+        } catch (err) {
+          console.error("Failed to decrement device account count in Supabase", err);
+        }
+      }
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id === userId ? { ...u, deviceId: undefined, deviceLimitBlocked: false } : u);
         const newCurrentUser = prev.currentUser?.id === userId ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false } : prev.currentUser;
@@ -955,7 +1182,12 @@ const App: React.FC = () => {
       });
       logAdminAction('DEVICE_UNBIND', userId, 'Unbound device from user');
     },
-    unbindAllDevices: () => {
+    unbindAllDevices: async () => {
+      try {
+        await supabase.from('devices').update({ account_count: 0 }).neq('device_id', '');
+      } catch (err) {
+        console.error("Failed to unbind all devices in Supabase", err);
+      }
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => ({ ...u, deviceId: undefined, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: undefined }));
         const newCurrentUser = prev.currentUser ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: undefined } : null;

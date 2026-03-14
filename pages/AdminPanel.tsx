@@ -162,21 +162,21 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                               <span className="text-sm font-medium text-gray-300">{tx.method}</span>
                               <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount}</span>
                            </div>
-                           {tx.type === 'WITHDRAW' && tx.status === 'PENDING' && (
+                           {tx.type === 'WITHDRAWAL' && tx.status === 'PENDING' && (
                               <div className="mt-2 pt-2 border-t border-gray-800 flex gap-2">
                                  <button 
-                                    onClick={() => {
+                                    onClick={async () => {
                                        const txId = prompt("Enter Payment TxID to approve:");
-                                       if (txId) adminActions.approveWithdrawal(user.id, tx.id, txId);
+                                       if (txId) await adminActions.approveWithdrawal(user.id, tx.id, txId);
                                     }}
                                     className="flex-1 bg-green-600/20 text-green-500 hover:bg-green-600/30 py-1.5 rounded text-xs font-bold transition-colors"
                                  >
                                     Approve
                                  </button>
                                  <button 
-                                    onClick={() => {
+                                    onClick={async () => {
                                        const reason = prompt("Enter Rejection Reason:");
-                                       if (reason) adminActions.rejectWithdrawal(user.id, tx.id, reason);
+                                       if (reason) await adminActions.rejectWithdrawal(user.id, tx.id, reason);
                                     }}
                                     className="flex-1 bg-red-600/20 text-red-500 hover:bg-red-600/30 py-1.5 rounded text-xs font-bold transition-colors"
                                  >
@@ -419,15 +419,15 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
                                     />
                                     <div className="flex gap-2 mt-1">
                                        <button 
-                                          onClick={() => adminActions.approveWithdrawal(tx.userId, tx.id, paymentTxId[tx.id])} 
+                                          onClick={async () => await adminActions.approveWithdrawal(tx.userId, tx.id, paymentTxId[tx.id])} 
                                           className="flex-1 bg-green-600/20 text-green-500 hover:bg-green-600/30 py-1.5 rounded text-xs font-bold transition-colors"
                                        >
                                           Approve
                                        </button>
                                        <button 
-                                          onClick={() => {
+                                          onClick={async () => {
                                              if (!rejectionReason[tx.id]) return alert("Rejection reason is required");
-                                             adminActions.rejectWithdrawal(tx.userId, tx.id, rejectionReason[tx.id]);
+                                             await adminActions.rejectWithdrawal(tx.userId, tx.id, rejectionReason[tx.id]);
                                           }} 
                                           className="flex-1 bg-red-600/20 text-red-500 hover:bg-red-600/30 py-1.5 rounded text-xs font-bold transition-colors"
                                        >
@@ -463,8 +463,8 @@ const AdminPanel: React.FC = () => {
       const match = log.details.match(/(\d+)/);
       return acc + (match ? parseInt(match[0]) : 0);
     }, 0);
-    const totalWithdrawalRequests = u.flatMap(us => us.transactions || []).filter(t => t.type === 'WITHDRAW').length;
-    const pendingWithdrawals = u.flatMap(us => us.transactions || []).filter(t => t.type === 'WITHDRAW' && t.status === 'PENDING').length;
+    const totalWithdrawalRequests = u.flatMap(us => us.transactions || []).filter(t => t.type === 'WITHDRAWAL').length;
+    const pendingWithdrawals = u.flatMap(us => us.transactions || []).filter(t => t.type === 'WITHDRAWAL' && t.status === 'PENDING').length;
     
     return {
       totalUsers: u.length,
@@ -567,7 +567,7 @@ const AdminPanel: React.FC = () => {
                         <div className="space-y-3">
                            {state.allUsers.flatMap(u => 
                               (u.transactions || [])
-                                 .filter(tx => tx.type === 'WITHDRAW' && tx.status === 'PENDING')
+                                 .filter(tx => tx.type === 'WITHDRAWAL' && tx.status === 'PENDING')
                                  .map(tx => ({ ...tx, userName: u.name, userId: u.id }))
                            ).sort((a, b) => b.timestamp - a.timestamp).slice(0, 3).map(tx => (
                               <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
@@ -1239,11 +1239,16 @@ const AdminPanel: React.FC = () => {
                                           {data.count} Accounts
                                        </span>
                                        <button 
-                                          onClick={() => adminActions.clearDeviceLimitForDevice(deviceId)}
-                                          disabled={state.settings.exemptDevices?.includes(deviceId)}
-                                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${state.settings.exemptDevices?.includes(deviceId) ? 'bg-green-600/20 text-green-500 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
+                                          onClick={() => {
+                                             if (state.settings.exemptDevices?.includes(deviceId)) {
+                                                adminActions.removeDeviceExemption(deviceId);
+                                             } else {
+                                                adminActions.clearDeviceLimitForDevice(deviceId);
+                                             }
+                                          }}
+                                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${state.settings.exemptDevices?.includes(deviceId) ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
                                        >
-                                          {state.settings.exemptDevices?.includes(deviceId) ? 'Device Exempted' : 'Exempt Entire Device'}
+                                          {state.settings.exemptDevices?.includes(deviceId) ? 'Remove Exemption' : 'Exempt Entire Device'}
                                        </button>
                                     </div>
                                  </div>
