@@ -131,40 +131,56 @@ const getPersistentDeviceId = () => {
   return deviceId;
 };
 
+const mapSupabaseUserToUser = (dbUser: any): User => {
+  return {
+    id: dbUser.id,
+    name: dbUser.name || dbUser.email?.split('@')[0] || 'User',
+    email: dbUser.email,
+    role: dbUser.role || 'user',
+    avatar: dbUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dbUser.email}`,
+    coins: dbUser.coins || 0,
+    tag: dbUser.tag || UserTag.NORMAL,
+    referralCode: dbUser.referralCode || Math.random().toString(36).substring(2, 8).toUpperCase(),
+    referredBy: dbUser.referredBy,
+    dailyEarned: dbUser.dailyEarned || 0,
+    lastResetTimestamp: dbUser.lastResetTimestamp || Date.now(),
+    createdAt: dbUser.created_at ? new Date(dbUser.created_at).getTime() : Date.now(),
+    adsWatchedToday: dbUser.adsWatchedToday || 0,
+    lastAdTimestamp: dbUser.lastAdTimestamp || 0,
+    dailyRewardClaimed: dbUser.dailyRewardClaimed || false,
+    streakDays: dbUser.streakDays || 0,
+    lastCheckInTimestamp: dbUser.lastCheckInTimestamp || 0,
+    spinsToday: dbUser.spinsToday || 0,
+    lastSpinTimestamp: dbUser.lastSpinTimestamp || 0,
+    extraSpinWatchedToday: dbUser.extraSpinWatchedToday || false,
+    scratchesToday: dbUser.scratchesToday || 0,
+    lastScratchTimestamp: dbUser.lastScratchTimestamp || 0,
+    extraScratchWatchedToday: dbUser.extraScratchWatchedToday || false,
+    status: dbUser.status || UserStatus.ACTIVE,
+    walletFrozen: dbUser.walletFrozen || false,
+    adsBlocked: dbUser.adsBlocked || false,
+    lastIp: dbUser.lastIp || '192.168.1.' + Math.floor(Math.random() * 255),
+    riskScore: dbUser.riskScore || 0,
+    earningVelocity: dbUser.earningVelocity || 0,
+    lastActiveAt: dbUser.lastActiveAt || Date.now(),
+    deviceId: dbUser.deviceId,
+    deviceLimitBlocked: dbUser.deviceLimitBlocked || false,
+    deviceLimitExempt: dbUser.deviceLimitExempt || false,
+    customDeviceLimit: dbUser.customDeviceLimit,
+    transactions: dbUser.transactions || [],
+    referralHistory: dbUser.referralHistory || []
+  };
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' }>(() => {
     const saved = localStorage.getItem('stk_app_state');
     const parsed = saved ? JSON.parse(saved) : null;
 
-    let allUsers = parsed?.allUsers || [];
-    if (parsed && parsed.allUserIds) {
-      allUsers = parsed.allUserIds.map((id: string) => {
-        const userStr = localStorage.getItem(`stk_user_${id}`);
-        const user = userStr ? JSON.parse(userStr) : null;
-        if (user && !user.createdAt) user.createdAt = user.lastResetTimestamp || Date.now();
-        return user;
-      }).filter(Boolean);
-    } else if (allUsers.length > 0) {
-      allUsers.forEach((user: User) => {
-        if (!user.createdAt) user.createdAt = user.lastResetTimestamp || Date.now();
-        localStorage.setItem(`stk_user_${user.id}`, JSON.stringify(user));
-      });
-    }
-
-    let currentUser = parsed?.currentUser || null;
-    if (parsed && parsed.currentUserId) {
-      const userStr = localStorage.getItem(`stk_user_${parsed.currentUserId}`);
-      currentUser = userStr ? JSON.parse(userStr) : null;
-      if (currentUser && !currentUser.createdAt) currentUser.createdAt = currentUser.lastResetTimestamp || Date.now();
-    } else if (currentUser) {
-      if (!currentUser.createdAt) currentUser.createdAt = currentUser.lastResetTimestamp || Date.now();
-      localStorage.setItem(`stk_user_${currentUser.id}`, JSON.stringify(currentUser));
-    }
-
     return {
-      currentUser,
-      allUsers,
-      isLoggedIn: !!currentUser,
+      currentUser: null,
+      allUsers: [],
+      isLoggedIn: false,
       logoUrl: parsed?.logoUrl || '',
       settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
       logs: parsed?.logs || [],
@@ -173,7 +189,7 @@ const App: React.FC = () => {
       adminUsers: parsed?.adminUsers || [{ email: ADMIN_EMAIL, role: 'SUPER_ADMIN', requires2FA: false }],
       deviceClaims: parsed?.deviceClaims || {},
       isAdBlockerActive: false,
-      isAdminSession: currentUser?.role === 'admin' || currentUser?.email === ADMIN_EMAIL || (parsed?.adminUsers || []).some((u: any) => u.email === currentUser?.email),
+      isAdminSession: false,
       theme: parsed?.theme || 'dark'
     };
   });
@@ -197,6 +213,42 @@ const App: React.FC = () => {
     fetchServerTime();
   }, []);
 
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) {
+        console.error("Error fetching all users from Supabase:", error);
+        return;
+      }
+      if (data) {
+        const users = data.map(mapSupabaseUserToUser);
+        setState(prev => {
+          // Merge fetched users with existing allUsers to avoid overwriting recent local updates
+          const newAllUsers = [...users];
+          prev.allUsers.forEach(localUser => {
+            const index = newAllUsers.findIndex(u => u.id === localUser.id);
+            if (index === -1) {
+              newAllUsers.push(localUser);
+            } else {
+              // Keep local updates if they are newer (e.g., lastActiveAt)
+              if (localUser.lastActiveAt > newAllUsers[index].lastActiveAt) {
+                newAllUsers[index] = { ...newAllUsers[index], ...localUser };
+              }
+            }
+          });
+          
+          // Update currentUser reference if it exists
+          const newCurrentUser = prev.currentUser 
+            ? newAllUsers.find(u => u.id === prev.currentUser!.id) || prev.currentUser
+            : null;
+
+          return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
+        });
+      }
+    };
+    fetchAllUsers();
+  }, []);
+
   const getServerTime = useCallback(() => {
     return Date.now() + timeOffsetRef.current;
   }, []);
@@ -213,10 +265,10 @@ const App: React.FC = () => {
       };
 
       // Sync account data to Supabase
-      const supabaseUpdates: any = {};
-      if (updates.coins !== undefined) supabaseUpdates.coins = updatedUser.coins;
-      if (updates.role !== undefined) supabaseUpdates.role = updatedUser.role;
-      if (updates.email !== undefined) supabaseUpdates.email = updatedUser.email;
+      const supabaseUpdates: any = { ...updates };
+      // Remove fields that might not exist in Supabase or shouldn't be updated directly
+      delete supabaseUpdates.id;
+      delete supabaseUpdates.createdAt;
       
       if (Object.keys(supabaseUpdates).length > 0) {
         supabase.from('users').update(supabaseUpdates).eq('id', updatedUser.id).then(({ error }) => {
@@ -300,15 +352,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const stateToSave = {
       ...state,
-      allUserIds: state.allUsers.map(u => u.id),
-      currentUserId: state.currentUser?.id,
       allUsers: undefined,
       currentUser: undefined
     };
-    
-    state.allUsers.forEach(user => {
-      localStorage.setItem(`stk_user_${user.id}`, JSON.stringify(user));
-    });
     
     localStorage.setItem('stk_app_state', JSON.stringify(stateToSave));
     if (state.theme === 'dark') {
@@ -423,18 +469,6 @@ const App: React.FC = () => {
     const currentCoins = dbUser?.coins || 0;
     const newCoins = currentCoins + amount;
 
-    // Update Supabase
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ coins: newCoins })
-      .eq('id', state.currentUser.id);
-
-    if (updateError) {
-      console.error("Failed to update balance:", updateError);
-      alert("Failed to process reward. Please try again.");
-      return false;
-    }
-
     const transaction: Transaction = {
       id: Math.random().toString(36).substring(2, 9),
       userId: state.currentUser.id,
@@ -444,6 +478,20 @@ const App: React.FC = () => {
       status: 'COMPLETED',
       timestamp: now
     };
+
+    const newTransactions = [transaction, ...(state.currentUser.transactions || [])];
+
+    // Update Supabase
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ coins: newCoins, transactions: newTransactions })
+      .eq('id', state.currentUser.id);
+
+    if (updateError) {
+      console.error("Failed to update balance:", updateError);
+      alert("Failed to process reward. Please try again.");
+      return false;
+    }
     
     // Update local state without triggering another Supabase sync for coins
     setState(prev => {
@@ -452,7 +500,7 @@ const App: React.FC = () => {
         ...prev.currentUser, 
         coins: newCoins,
         dailyEarned: todayEarned + (amount > 0 ? amount : 0),
-        transactions: [transaction, ...(prev.currentUser.transactions || [])],
+        transactions: newTransactions,
         lastActiveAt: Date.now() 
       };
       return {
@@ -583,6 +631,11 @@ const App: React.FC = () => {
 
   const login = async (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
     let user = state.allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user && supabaseUser) {
+      user = mapSupabaseUserToUser(supabaseUser);
+    }
+
     const isAdmin = supabaseUser?.role === 'admin' || user?.role === 'admin' || email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const persistentId = getPersistentDeviceId();
     
@@ -689,24 +742,55 @@ const App: React.FC = () => {
         earningVelocity: 0,
         lastActiveAt: Date.now()
       };
-      setState(prev => ({ ...prev, allUsers: [...prev.allUsers, user!] }));
+      setState(prev => {
+        let updatedAllUsers = [...prev.allUsers, user!];
+        
+        // Handle referral reward
+        if (referralCode) {
+          const referrerIndex = updatedAllUsers.findIndex(u => u.referralCode === referralCode);
+          if (referrerIndex !== -1) {
+            const referrer = updatedAllUsers[referrerIndex];
+            const reward = prev.settings.referralReward || 50;
+            const updatedReferrer = {
+              ...referrer,
+              coins: referrer.coins + reward,
+              referralHistory: [
+                ...(referrer.referralHistory || []),
+                {
+                  referredUserId: user!.id,
+                  referredUserName: user!.name,
+                  timestamp: Date.now(),
+                  reward: reward
+                }
+              ]
+            };
+            updatedAllUsers[referrerIndex] = updatedReferrer;
+            
+            // Sync referrer to Supabase
+            supabase.from('users').update({ 
+              coins: updatedReferrer.coins,
+              referralHistory: updatedReferrer.referralHistory
+            }).eq('id', referrer.id).then(({ error }) => {
+              if (error) console.error("Failed to update referrer in Supabase", error);
+            });
+          }
+        }
+        
+        return { ...prev, allUsers: updatedAllUsers };
+      });
     } else {
       // Update existing user's data from Supabase
-      let needsUpdate = false;
-      if (supabaseUser?.role && user.role !== supabaseUser.role) {
-        user.role = supabaseUser.role;
-        needsUpdate = true;
-      }
-      if (supabaseUser?.coins !== undefined && user.coins !== supabaseUser.coins) {
-        user.coins = supabaseUser.coins;
-        needsUpdate = true;
-      }
-      
-      if (needsUpdate) {
-        setState(prev => ({
-          ...prev,
-          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, role: user!.role, coins: user!.coins } : u)
-        }));
+      if (supabaseUser) {
+        user = mapSupabaseUserToUser(supabaseUser);
+        setState(prev => {
+          const exists = prev.allUsers.some(u => u.id === user!.id);
+          return {
+            ...prev,
+            allUsers: exists 
+              ? prev.allUsers.map(u => u.id === user!.id ? user! : u)
+              : [...prev.allUsers, user!]
+          };
+        });
       }
 
       // Update existing user's device ID to the persistent one if it's different
@@ -720,6 +804,9 @@ const App: React.FC = () => {
           ...prev,
           allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceId: persistentId } : u)
         }));
+        supabase.from('users').update({ deviceId: persistentId }).eq('id', user.id).then(({ error }) => {
+          if (error) console.error("Failed to sync deviceId to Supabase", error);
+        });
       }
       
       if (user.deviceLimitBlocked !== isDeviceBlocked) {
@@ -728,6 +815,9 @@ const App: React.FC = () => {
           ...prev,
           allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceLimitBlocked: isDeviceBlocked } : u)
         }));
+        supabase.from('users').update({ deviceLimitBlocked: isDeviceBlocked }).eq('id', user.id).then(({ error }) => {
+          if (error) console.error("Failed to sync deviceLimitBlocked to Supabase", error);
+        });
       }
     }
     setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
@@ -778,6 +868,10 @@ const App: React.FC = () => {
         }
 
         const deviceId = getPersistentDeviceId();
+        const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
+        if (pendingReferralCode) {
+          localStorage.removeItem('pending_referral_code');
+        }
 
         if (!existingUser) {
           // Create new user in Supabase
@@ -786,13 +880,14 @@ const App: React.FC = () => {
             email: email,
             role: 'user',
             coins: 0,
+            referredBy: pendingReferralCode,
             created_at: new Date().toISOString()
           };
           const { error: insertError } = await supabase.from('users').insert([newUser]);
           if (insertError) {
             console.error("Error inserting new user:", insertError);
           }
-          loginRef.current(email, name, undefined, newUser);
+          loginRef.current(email, name, pendingReferralCode, newUser);
         } else {
           loginRef.current(email, name, undefined, existingUser);
         }
@@ -952,10 +1047,12 @@ const App: React.FC = () => {
 
       const newCoins = user.coins - deductAmount;
 
+      const newTransactions = (user.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t);
+
       // Update Supabase users table
       const { error: userUpdateError } = await supabase
         .from('users')
-        .update({ coins: newCoins })
+        .update({ coins: newCoins, transactions: newTransactions })
         .eq('id', userId);
 
       if (userUpdateError) {
@@ -982,7 +1079,7 @@ const App: React.FC = () => {
           return { 
             ...u, 
             coins: newCoins,
-            transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t) 
+            transactions: newTransactions
           };
         });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -1003,6 +1100,14 @@ const App: React.FC = () => {
         return alert("Failed to update withdrawal status. Please try again.");
       }
 
+      const user = state.allUsers.find(u => u.id === userId);
+      if (user) {
+        const newTransactions = (user.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t);
+        supabase.from('users').update({ transactions: newTransactions }).eq('id', userId).then(({ error }) => {
+          if (error) console.error("Failed to sync rejected transaction to Supabase", error);
+        });
+      }
+
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
@@ -1018,6 +1123,9 @@ const App: React.FC = () => {
       logAdminAction('PAYOUT_REJECT', userId, `Rejected payout ${txId}. Reason: ${rejectionReason}`);
     },
     setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => {
+      supabase.from('users').update({ walletFrozen: frozen }).eq('id', userId).then(({ error }) => {
+        if (error) console.error("Failed to sync wallet frozen status to Supabase", error);
+      });
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, walletFrozen: frozen });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -1026,6 +1134,9 @@ const App: React.FC = () => {
       logAdminAction(frozen ? 'WALLET_FREEZE' : 'WALLET_UNFREEZE', userId, reason || '');
     },
     setUserStatus: (userId: string, status: UserStatus, reason?: string) => {
+      supabase.from('users').update({ status, statusReason: reason }).eq('id', userId).then(({ error }) => {
+        if (error) console.error("Failed to sync user status to Supabase", error);
+      });
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, status, statusReason: reason });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -1049,11 +1160,12 @@ const App: React.FC = () => {
           const newCoins = Math.max(0, u.coins + amount);
           
           // Sync to Supabase
-          supabase.from('users').update({ coins: newCoins }).eq('id', u.id).then(({ error }) => {
+          const newTransactions = [tx, ...(u.transactions || [])];
+          supabase.from('users').update({ coins: newCoins, transactions: newTransactions }).eq('id', u.id).then(({ error }) => {
             if (error) console.error("Failed to sync admin coin adjustment to Supabase", error);
           });
           
-          return { ...u, coins: newCoins, transactions: [tx, ...(u.transactions || [])] };
+          return { ...u, coins: newCoins, transactions: newTransactions };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -1073,6 +1185,11 @@ const App: React.FC = () => {
              updates.scratchesToday = 0;
              updates.lastScratchTimestamp = 0;
           }
+          
+          supabase.from('users').update(updates).eq('id', u.id).then(({ error }) => {
+            if (error) console.error("Failed to sync cooldown reset to Supabase", error);
+          });
+          
           return { ...u, ...updates };
         });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -1084,7 +1201,11 @@ const App: React.FC = () => {
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => {
           if (u.id !== userId) return u;
-          return { ...u, streakDays: 0, dailyRewardClaimed: false };
+          const updates = { streakDays: 0, dailyRewardClaimed: false };
+          supabase.from('users').update(updates).eq('id', u.id).then(({ error }) => {
+            if (error) console.error("Failed to sync streak reset to Supabase", error);
+          });
+          return { ...u, ...updates };
         });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
@@ -1093,10 +1214,9 @@ const App: React.FC = () => {
     },
     updateUserSettings: (userId: string, updates: Partial<User>) => {
       // Sync to Supabase
-      const supabaseUpdates: any = {};
-      if (updates.coins !== undefined) supabaseUpdates.coins = updates.coins;
-      if (updates.role !== undefined) supabaseUpdates.role = updates.role;
-      if (updates.email !== undefined) supabaseUpdates.email = updates.email;
+      const supabaseUpdates: any = { ...updates };
+      delete supabaseUpdates.id;
+      delete supabaseUpdates.createdAt;
       
       if (Object.keys(supabaseUpdates).length > 0) {
         supabase.from('users').update(supabaseUpdates).eq('id', userId).then(({ error }) => {
@@ -1117,6 +1237,9 @@ const App: React.FC = () => {
       setActiveTab('home');
     },
     clearDeviceLimitForUser: (userId: string) => {
+      supabase.from('users').update({ deviceLimitExempt: true }).eq('id', userId).then(({ error }) => {
+        if (error) console.error("Failed to sync device limit exemption to Supabase", error);
+      });
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, deviceLimitExempt: true });
         const updated = newAllUsers.find(u => u.id === userId);
@@ -1152,6 +1275,7 @@ const App: React.FC = () => {
     resetDeviceRestrictions: async () => {
       try {
         await supabase.from('devices').update({ account_count: 0, is_whitelisted: false }).neq('device_id', '');
+        await supabase.from('users').update({ deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: null }).neq('id', '');
       } catch (err) {
         console.error("Failed to reset devices in Supabase", err);
       }
@@ -1175,6 +1299,9 @@ const App: React.FC = () => {
           console.error("Failed to decrement device account count in Supabase", err);
         }
       }
+      supabase.from('users').update({ deviceId: null, deviceLimitBlocked: false }).eq('id', userId).then(({ error }) => {
+        if (error) console.error("Failed to sync device unbind to Supabase", error);
+      });
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id === userId ? { ...u, deviceId: undefined, deviceLimitBlocked: false } : u);
         const newCurrentUser = prev.currentUser?.id === userId ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false } : prev.currentUser;
@@ -1185,6 +1312,7 @@ const App: React.FC = () => {
     unbindAllDevices: async () => {
       try {
         await supabase.from('devices').update({ account_count: 0 }).neq('device_id', '');
+        await supabase.from('users').update({ deviceId: null, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: null }).neq('id', '');
       } catch (err) {
         console.error("Failed to unbind all devices in Supabase", err);
       }
@@ -1199,7 +1327,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!state.isLoggedIn) {
-      return <Login onLogin={login} />;
+      return <Login />;
     }
     if (state.currentUser?.status === UserStatus.BANNED && !state.isAdminSession) {
       return (

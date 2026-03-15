@@ -4,11 +4,7 @@ import { Mail, Hash, ShieldCheck, ShieldAlert, Sparkles, UserCheck, Facebook, Se
 import { useApp } from '../App';
 import { supabase } from '../supabase';
 
-interface LoginProps {
-  onLogin: (email: string, name: string, referralCode?: string) => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC = () => {
   const [referralCode, setReferralCode] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginMode, setLoginMode] = useState<'social' | 'email'>('social');
@@ -44,6 +40,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
 
+    if (referralCode) {
+      localStorage.setItem('pending_referral_code', referralCode);
+    }
+
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -69,22 +69,60 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  const handleEmailLogin = (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
     if (isRegistering && !name) return;
     
     setIsLoggingIn(true);
-    // Simulate network delay
-    setTimeout(() => {
-      if (email.toLowerCase() === 'admin@stk.com' && password !== 'admin@123') {
-        alert("Invalid Admin Credentials");
-        setIsLoggingIn(false);
-        return;
+
+    if (referralCode) {
+      localStorage.setItem('pending_referral_code', referralCode);
+    }
+
+    try {
+      if (isRegistering) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name,
+            }
+          }
+        });
+
+        if (error) {
+          alert(`Registration Error: ${error.message}`);
+          setIsLoggingIn(false);
+          return;
+        }
+
+        if (data.session) {
+          // The onAuthStateChange listener will handle the rest
+        } else {
+          alert("Registration successful! Please check your email to verify your account.");
+          setIsLoggingIn(false);
+          setIsRegistering(false);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          alert(`Login Error: ${error.message}`);
+          setIsLoggingIn(false);
+          return;
+        }
+        // The onAuthStateChange listener will handle the rest
       }
-      onLogin(email, name || email.split('@')[0], referralCode);
+    } catch (err) {
+      console.error("Email Auth Error:", err);
+      alert("An unexpected error occurred.");
       setIsLoggingIn(false);
-    }, 1500);
+    }
   };
 
   const handleOtherProvider = (provider: string) => {
@@ -180,19 +218,33 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         ) : (
           <form onSubmit={handleEmailLogin} className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
             {isRegistering && (
-              <div className="space-y-2">
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="text"
-                    placeholder="FULL NAME"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 p-4 pl-12 rounded-2xl font-bold text-sm text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all uppercase"
-                    required
-                  />
+              <>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="FULL NAME"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 p-4 pl-12 rounded-2xl font-bold text-sm text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all uppercase"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="REFERRAL CODE (OPTIONAL)"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 p-4 pl-12 rounded-2xl font-bold text-sm text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all uppercase tracking-[0.2em]"
+                    />
+                  </div>
+                </div>
+              </>
             )}
             <div className="space-y-2">
               <div className="relative">
