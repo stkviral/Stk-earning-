@@ -453,11 +453,20 @@ const App: React.FC = () => {
       amount = allowed;
     }
 
+    // Get authenticated Supabase user ID
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      console.error("Authentication error:", authError);
+      alert("You must be logged in to earn rewards.");
+      return false;
+    }
+    const authUserId = authData.user.id;
+
     // Fetch current balance from Supabase
     const { data: dbUser, error: fetchError } = await supabase
       .from('users')
       .select('coins')
-      .eq('id', state.currentUser.id)
+      .eq('id', authUserId)
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
@@ -471,7 +480,7 @@ const App: React.FC = () => {
 
     const transaction: Transaction = {
       id: Math.random().toString(36).substring(2, 9),
-      userId: state.currentUser.id,
+      userId: authUserId,
       amount,
       type,
       method,
@@ -485,7 +494,7 @@ const App: React.FC = () => {
     const { error: updateError } = await supabase
       .from('users')
       .update({ coins: newCoins, transactions: newTransactions })
-      .eq('id', state.currentUser.id);
+      .eq('id', authUserId);
 
     if (updateError) {
       console.error("Failed to update balance:", updateError);
@@ -668,7 +677,7 @@ const App: React.FC = () => {
              }
            } else if (user.deviceId !== persistentId) {
              // Decrement count on old device if it exists
-             if (user.deviceId) {
+             if (user.deviceId && !user.deviceLimitBlocked) {
                try {
                  const { data: oldDevice } = await supabase.from('devices').select('account_count').eq('device_id', user.deviceId).single();
                  if (oldDevice && oldDevice.account_count > 0) {
@@ -679,14 +688,28 @@ const App: React.FC = () => {
                }
              }
              
-             currentCount += 1;
-             await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
-             if (!isWhitelisted && currentCount > limit) {
+             if (!isWhitelisted && currentCount >= limit) {
                isDeviceBlocked = true;
+             } else {
+               currentCount += 1;
+               await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
+               isDeviceBlocked = false;
              }
            } else {
-             if (!isWhitelisted && currentCount > limit) {
-               isDeviceBlocked = true;
+             if (!isWhitelisted) {
+               if (user.deviceLimitBlocked) {
+                 if (currentCount < limit) {
+                   currentCount += 1;
+                   await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
+                   isDeviceBlocked = false;
+                 } else {
+                   isDeviceBlocked = true;
+                 }
+               } else if (currentCount > limit) {
+                 isDeviceBlocked = true;
+                 currentCount -= 1;
+                 await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
+               }
              }
            }
         }
@@ -704,8 +727,7 @@ const App: React.FC = () => {
     if (!user) {
       // Check device limit for NEW accounts
       if (isDeviceBlocked) {
-        alert(`Device limit reached. You cannot create more than ${state.settings.maxAccountsPerDevice ?? 3} accounts on this device.`);
-        return;
+        console.warn(`Device limit reached. Account will be created but reward actions will be blocked.`);
       }
 
       user = {
@@ -737,6 +759,7 @@ const App: React.FC = () => {
         transactions: [],
         referralHistory: [],
         deviceId: persistentId,
+        deviceLimitBlocked: isDeviceBlocked,
         lastIp: '192.168.1.' + Math.floor(Math.random() * 255),
         riskScore: 0,
         earningVelocity: 0,
@@ -796,8 +819,7 @@ const App: React.FC = () => {
       // Update existing user's device ID to the persistent one if it's different
       if (user.deviceId !== persistentId) {
         if (isDeviceBlocked) {
-          alert(`Device limit reached. You cannot log into this account on this device.`);
-          return;
+          console.warn(`Device limit reached. You can log into this account on this device, but reward actions will be blocked.`);
         }
         user.deviceId = persistentId;
         setState(prev => ({
@@ -943,6 +965,14 @@ const App: React.FC = () => {
     const upiRegex = /^[\w\.-]+@[\w\.-]+$/;
     if (!upiRegex.test(upiId)) return "Invalid UPI ID format.";
     
+    // Get authenticated Supabase user ID
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      console.error("Authentication error:", authError);
+      return "You must be logged in to request a withdrawal.";
+    }
+    const authUserId = authData.user.id;
+
     const feePercentage = state.settings.withdrawalFeeNormal;
     const feeAmount = Math.floor(amount * (feePercentage / 100));
     const finalAmount = amount - feeAmount;
@@ -959,23 +989,22 @@ const App: React.FC = () => {
       }
     }
 
-    const txId = 'WD-' + Math.random().toString(36).substring(2, 9);
     const now = Date.now();
 
     // Insert into Supabase withdrawals table
-    const { error: insertError } = await supabase.from('withdrawals').insert([{
-      id: txId,
-      user_id: state.currentUser.id,
+    const { data: insertedData, error: insertError } = await supabase.from('withdrawals').insert([{
+      user_id: authUserId,
       amount: finalAmount,
       status: 'pending',
-      upi_id: upiId,
       created_at: new Date(now).toISOString()
-    }]);
+    }]).select().single();
 
     if (insertError) {
       console.error("Failed to create withdrawal request:", insertError);
       return "Failed to process withdrawal request. Please try again.";
     }
+
+    const txId = insertedData?.id || 'WD-' + Math.random().toString(36).substring(2, 9);
 
     const tx: Transaction = {
       id: txId,
@@ -1373,25 +1402,10 @@ const App: React.FC = () => {
   const isDeviceLimitReached = React.useMemo(() => {
     if (!state.currentUser || !state.settings.deviceLimitEnabled) return false;
     if (state.isAdminSession || state.currentUser.deviceLimitExempt) return false;
-    if (state.currentUser.deviceLimitBlocked) return true;
     if (state.settings.exemptDevices?.includes(state.currentUser.deviceId)) return false;
     
-    const usersOnDevice = state.allUsers.filter(u => u.deviceId === state.currentUser?.deviceId);
-    const limit = state.currentUser.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
-    
-    if (usersOnDevice.length <= limit) return false;
-
-    // Sort users by creation time to ensure the oldest accounts are allowed and only the excess newer accounts are blocked.
-    const sortedUsers = [...usersOnDevice].sort((a, b) => {
-      const timeA = a.createdAt || 0;
-      const timeB = b.createdAt || 0;
-      if (timeA !== timeB) return timeA - timeB;
-      return a.id.localeCompare(b.id);
-    });
-    const allowedUsers = sortedUsers.slice(0, limit);
-    
-    return !allowedUsers.some(u => u.id === state.currentUser?.id);
-  }, [state.currentUser, state.settings, state.isAdminSession, state.allUsers]);
+    return state.currentUser.deviceLimitBlocked || false;
+  }, [state.currentUser, state.settings, state.isAdminSession]);
 
   return (
     <AppContext.Provider value={{
