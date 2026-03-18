@@ -134,11 +134,11 @@ export interface AppSettings {
   referralReward: number;
   spinRewards: number[];
   maxDailySpinsNormal: number;
-  spinCooldownMinutes: number;
+  spinCooldownSeconds: number;
   spinAdRequired: boolean;
   scratchRewards: number[];
   maxDailyScratchesNormal: number;
-  scratchCooldownMinutes: number;
+  scratchCooldownSeconds: number;
   scratchAdRequired: boolean;
   scratchProbabilities: Record<string, number>;
   withdrawalFeeNormal: number;
@@ -147,7 +147,7 @@ export interface AppSettings {
   manualWithdrawalApproval: boolean;
   withdrawalCooldownHours: number;
   maxDailyAds: number;
-  adCooldownMinutes: number;
+  adCooldownSeconds: number;
   videoAdRequired: boolean;
   dailyWithdrawalLimit: number;
   spinProbabilities: Record<string, number>;

@@ -19,17 +19,17 @@ const ScratchCard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!currentUser || !settings.scratchCooldownMinutes) return;
+    if (!currentUser || !settings.scratchCooldownSeconds) return;
     
     const interval = setInterval(() => {
       const now = getServerTime();
-      const cooldownMs = settings.scratchCooldownMinutes * 60 * 1000;
+      const cooldownMs = settings.scratchCooldownSeconds * 1000;
       const diff = cooldownMs - (now - (currentUser.lastScratchTimestamp || 0));
       setCooldownTime(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastScratchTimestamp, settings.scratchCooldownMinutes, getServerTime]);
+  }, [currentUser?.lastScratchTimestamp, settings.scratchCooldownSeconds, getServerTime]);
 
   // Initialize canvas
   useEffect(() => {

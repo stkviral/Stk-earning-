@@ -730,8 +730,8 @@ const AdminPanel: React.FC = () => {
                                  <input type="number" value={state.settings.maxDailySpinsNormal ?? 0} onChange={e => updateSettings({ maxDailySpinsNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-blue-500" />
                               </div>
                               <div>
-                                 <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Min)</label>
-                                 <input type="number" value={state.settings.spinCooldownMinutes ?? 0} onChange={e => updateSettings({ spinCooldownMinutes: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-blue-500" />
+                                 <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Sec)</label>
+                                 <input type="number" value={state.settings.spinCooldownSeconds ?? 0} onChange={e => updateSettings({ spinCooldownSeconds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-blue-500" />
                               </div>
                               <div className="flex items-center justify-between bg-gray-950 border border-gray-800 p-2 rounded-lg">
                                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ad Required</label>
@@ -775,8 +775,8 @@ const AdminPanel: React.FC = () => {
                                  <input type="number" value={state.settings.maxDailyScratchesNormal ?? 0} onChange={e => updateSettings({ maxDailyScratchesNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-purple-500" />
                               </div>
                               <div>
-                                 <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Min)</label>
-                                 <input type="number" value={state.settings.scratchCooldownMinutes ?? 0} onChange={e => updateSettings({ scratchCooldownMinutes: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-purple-500" />
+                                 <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Sec)</label>
+                                 <input type="number" value={state.settings.scratchCooldownSeconds ?? 0} onChange={e => updateSettings({ scratchCooldownSeconds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-purple-500" />
                               </div>
                               <div className="flex items-center justify-between bg-gray-950 border border-gray-800 p-2 rounded-lg">
                                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ad Required</label>
@@ -804,8 +804,8 @@ const AdminPanel: React.FC = () => {
                               <input type="number" value={state.settings.maxDailyAds ?? 0} onChange={e => updateSettings({ maxDailyAds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-red-500" />
                            </div>
                            <div>
-                              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Min)</label>
-                              <input type="number" value={state.settings.adCooldownMinutes ?? 0} onChange={e => updateSettings({ adCooldownMinutes: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-red-500" />
+                              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Cooldown (Sec)</label>
+                              <input type="number" value={state.settings.adCooldownSeconds ?? 0} onChange={e => updateSettings({ adCooldownSeconds: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-red-500" />
                            </div>
                         </div>
                         <div className="flex items-center justify-between bg-gray-950 p-3 rounded-xl border border-gray-800">

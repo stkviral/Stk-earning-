@@ -15,13 +15,13 @@ const Videos: React.FC = () => {
     // Manage interval for reward video cooldown
     const interval = setInterval(() => {
       const now = getServerTime();
-      const cooldownMs = settings.adCooldownMinutes * 60 * 1000;
+      const cooldownMs = settings.adCooldownSeconds * 1000;
       const diff = cooldownMs - (now - currentUser.lastAdTimestamp);
       setTimeLeft(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastAdTimestamp, getServerTime, settings.adCooldownMinutes]);
+  }, [currentUser?.lastAdTimestamp, getServerTime, settings.adCooldownSeconds]);
 
   if (!currentUser) return null;
 

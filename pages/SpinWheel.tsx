@@ -21,17 +21,17 @@ const SpinWheel: React.FC = () => {
   const wheelRef = useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (!currentUser || !settings.spinCooldownMinutes) return;
+    if (!currentUser || !settings.spinCooldownSeconds) return;
     
     const interval = setInterval(() => {
       const now = getServerTime();
-      const cooldownMs = settings.spinCooldownMinutes * 60 * 1000;
+      const cooldownMs = settings.spinCooldownSeconds * 1000;
       const diff = cooldownMs - (now - (currentUser.lastSpinTimestamp || 0));
       setCooldownTime(Math.max(0, Math.ceil(diff / 1000)));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastSpinTimestamp, settings.spinCooldownMinutes, getServerTime]);
+  }, [currentUser?.lastSpinTimestamp, settings.spinCooldownSeconds, getServerTime]);
 
   if (!currentUser) return null;
 
