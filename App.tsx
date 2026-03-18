@@ -32,8 +32,9 @@ interface AppContextType {
   updateLogo: (url: string) => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
   addCoins: (amount: number, method: string, type?: Transaction['type']) => Promise<boolean>;
-  claimSpinReward: (reward: number) => Promise<boolean>;
-  claimScratchReward: (reward: number) => Promise<boolean>;
+  claimSpinReward: () => Promise<number | null>;
+  claimScratchReward: () => Promise<number | null>;
+  claimAdReward: () => Promise<number | null>;
   claimDailyCheckIn: () => Promise<boolean>;
   playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => void;
   login: (email: string, name: string, referralCode?: string) => void;
@@ -51,14 +52,14 @@ interface AppContextType {
   adminActions: {
     approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => Promise<void>;
     rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => Promise<void>;
-    setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => void;
-    setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => void;
-    modifyCoins: (userId: string, amount: number, reason: string) => void;
-    resetCooldowns: (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => void;
-    resetStreak: (userId: string, reason: string) => void;
-    updateUserSettings: (userId: string, updates: Partial<User>) => void;
+    setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => Promise<void>;
+    setUserStatus: (userId: string, status: UserStatus, reason?: string, durationMs?: number) => Promise<void>;
+    modifyCoins: (userId: string, amount: number, reason: string) => Promise<void>;
+    resetCooldowns: (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => Promise<void>;
+    resetStreak: (userId: string, reason: string) => Promise<void>;
+    updateUserSettings: (userId: string, updates: Partial<User>) => Promise<void>;
     impersonateUser: (userId: string) => void;
-    clearDeviceLimitForUser: (userId: string) => void;
+    clearDeviceLimitForUser: (userId: string) => Promise<void>;
     clearDeviceLimitForDevice: (deviceId: string) => Promise<void>;
     removeDeviceExemption: (deviceId: string) => Promise<void>;
     resetDeviceRestrictions: () => Promise<void>;
@@ -129,6 +130,47 @@ const getPersistentDeviceId = () => {
     localStorage.setItem('stk_device_id', deviceId);
   }
   return deviceId;
+};
+
+const isEmulator = () => {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('bluestacks') || ua.includes('nox') || ua.includes('memu') || ua.includes('ldplayer') || ua.includes('emulator')) return true;
+  if (navigator.hardwareConcurrency === undefined || navigator.deviceMemory === undefined) return true;
+  if (window.navigator.webdriver) return true;
+  return false;
+};
+
+const generateDeviceFingerprint = async () => {
+  try {
+    const components = [
+      navigator.userAgent,
+      navigator.language,
+      screen.colorDepth,
+      screen.width + 'x' + screen.height,
+      new Date().getTimezoneOffset(),
+      navigator.hardwareConcurrency,
+      navigator.deviceMemory,
+      navigator.platform
+    ];
+    const stringToHash = components.join('|');
+    const encoder = new TextEncoder();
+    const data = encoder.encode(stringToHash);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return getPersistentDeviceId();
+  }
+};
+
+const getIpAddress = async () => {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const data = await res.json();
+    return data.ip;
+  } catch (e) {
+    return '192.168.1.' + Math.floor(Math.random() * 255);
+  }
 };
 
 const mapSupabaseUserToUser = (dbUser: any): User => {
@@ -215,39 +257,50 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const fetchAllUsers = async () => {
-      const { data, error } = await supabase.from('users').select('*');
-      if (error) {
-        console.error("Error fetching all users from Supabase:", error);
-        return;
-      }
-      if (data) {
-        const users = data.map(mapSupabaseUserToUser);
-        setState(prev => {
-          // Merge fetched users with existing allUsers to avoid overwriting recent local updates
-          const newAllUsers = [...users];
-          prev.allUsers.forEach(localUser => {
-            const index = newAllUsers.findIndex(u => u.id === localUser.id);
-            if (index === -1) {
-              newAllUsers.push(localUser);
-            } else {
-              // Keep local updates if they are newer (e.g., lastActiveAt)
-              if (localUser.lastActiveAt > newAllUsers[index].lastActiveAt) {
-                newAllUsers[index] = { ...newAllUsers[index], ...localUser };
+      try {
+        let endpoint = '/api/leaderboard';
+        if (state.isAdminSession && state.currentUser?.id) {
+          endpoint = `/api/admin/view-users?adminId=${state.currentUser.id}`;
+        }
+        
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          console.error("Failed to fetch users from API");
+          return;
+        }
+        const { users: data } = await response.json();
+        
+        if (data) {
+          const users = data.map(mapSupabaseUserToUser);
+          setState(prev => {
+            // Merge fetched users with existing allUsers to avoid overwriting recent local updates
+            const newAllUsers = [...users];
+            prev.allUsers.forEach(localUser => {
+              const index = newAllUsers.findIndex(u => u.id === localUser.id);
+              if (index === -1) {
+                newAllUsers.push(localUser);
+              } else {
+                // Keep local updates if they are newer, or if it's the current user (to preserve transactions)
+                if (localUser.id === prev.currentUser?.id || localUser.lastActiveAt > newAllUsers[index].lastActiveAt) {
+                  newAllUsers[index] = { ...newAllUsers[index], ...localUser };
+                }
               }
-            }
-          });
-          
-          // Update currentUser reference if it exists
-          const newCurrentUser = prev.currentUser 
-            ? newAllUsers.find(u => u.id === prev.currentUser!.id) || prev.currentUser
-            : null;
+            });
+            
+            // Update currentUser reference if it exists
+            const newCurrentUser = prev.currentUser 
+              ? newAllUsers.find(u => u.id === prev.currentUser!.id) || prev.currentUser
+              : null;
 
-          return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
-        });
+            return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
       }
     };
     fetchAllUsers();
-  }, []);
+  }, [state.isAdminSession, state.currentUser?.id]);
 
   const getServerTime = useCallback(() => {
     return Date.now() + timeOffsetRef.current;
@@ -404,9 +457,37 @@ const App: React.FC = () => {
 
     // Auto-clicker protection (actions too fast)
     const now = getServerTime();
-    if (!state.isAdminSession && !state.currentUser.fraudDetectionExempt && now - lastRewardTimeRef.current < 500 && baseAmount > 0) {
-      logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'AUTO_CLICKER', `Claimed ${baseAmount} coins in under 500ms`);
-      return false;
+    if (!state.isAdminSession && !state.currentUser.fraudDetectionExempt && baseAmount > 0) {
+      const timeSinceLast = now - lastRewardTimeRef.current;
+      
+      if (timeSinceLast < 500) {
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'AUTO_CLICKER', `Claimed ${baseAmount} coins in under 500ms`);
+        return false;
+      }
+      
+      if (type === 'SPIN' && timeSinceLast < 2000) {
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'REWARD_SPEED', `Spin interval less than 2 seconds`);
+        return false;
+      }
+      
+      if (type === 'SCRATCH' && timeSinceLast < 2000) {
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'REWARD_SPEED', `Scratch interval less than 2 seconds`);
+        return false;
+      }
+      
+      if (type === 'AD' && timeSinceLast < 5000) {
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'REWARD_SPEED', `Ad completed too quickly`);
+        return false;
+      }
+
+      // Behavior Pattern Detection: > 50 actions in 5 minutes
+      const fiveMinsAgo = now - 5 * 60 * 1000;
+      const recentActions = (state.activityLogs || []).filter(l => l.userId === state.currentUser!.id && l.timestamp > fiveMinsAgo).length;
+      if (recentActions > 50) {
+        logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'BOT_PATTERN', `More than 50 reward actions in 5 minutes`);
+        alert("Suspicious activity detected. Rewards temporarily blocked.");
+        return false;
+      }
     }
     lastRewardTimeRef.current = now;
     
@@ -445,12 +526,11 @@ const App: React.FC = () => {
     }
 
     if (!state.isAdminSession && !state.currentUser.rewardLimitExempt && todayEarned + amount > dailyCap && amount > 0) {
-      const allowed = dailyCap - todayEarned;
-      if (allowed <= 0) {
-        alert("Daily earning cap reached!");
+      if (todayEarned >= dailyCap) {
+        alert("Daily earning limit reached. Come back tomorrow.");
         return false;
       }
-      amount = allowed;
+      amount = dailyCap - todayEarned;
     }
 
     // Get authenticated Supabase user ID
@@ -529,58 +609,186 @@ const App: React.FC = () => {
     return 1.0 + (dayInCycle - 1) * 0.1;
   };
 
-  const claimSpinReward = useCallback(async (reward: number): Promise<boolean> => {
-    if (!state.currentUser) return false;
-    if (state.settings.rewardDelayMs > 0) {
-      await new Promise(resolve => setTimeout(resolve, state.settings.rewardDelayMs));
-    }
-    const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
-    const finalReward = Math.round(reward * multiplier);
+  const claimSpinReward = useCallback(async (): Promise<number | null> => {
+    if (!state.currentUser) return null;
     
-    const success = await addCoins(finalReward, 'Spin Reward', 'SPIN');
-    if (success) {
-      logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
+    try {
+      const response = await fetch('/api/rewards/spin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.currentUser.id })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || "Failed to claim reward");
+        return null;
+      }
+      
+      const { reward, newCoins, newDailyEarned } = data;
+      
+      // Update local state
+      setState(prev => {
+        if (!prev.currentUser) return prev;
+        const updatedUser = {
+          ...prev.currentUser,
+          coins: newCoins,
+          dailyEarned: newDailyEarned,
+          spinsToday: (prev.currentUser.spinsToday || 0) + 1,
+          lastSpinTimestamp: Date.now(),
+          last_reward_time: Date.now()
+        };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+      
+      logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${reward} coins`);
+      return reward;
+    } catch (error) {
+      console.error("Error claiming spin reward:", error);
+      alert("Network error. Please try again.");
+      return null;
     }
-    return success;
-  }, [state.currentUser, state.settings.rewardDelayMs, addCoins, logActivity]);
+  }, [state.currentUser, logActivity]);
 
-  const claimScratchReward = useCallback(async (reward: number): Promise<boolean> => {
-    if (!state.currentUser) return false;
-    if (state.settings.rewardDelayMs > 0) {
-      await new Promise(resolve => setTimeout(resolve, state.settings.rewardDelayMs));
-    }
-    const multiplier = getActiveMultiplier(state.currentUser.streakDays || 0);
-    const finalReward = Math.round(reward * multiplier);
+  const claimScratchReward = useCallback(async (): Promise<number | null> => {
+    if (!state.currentUser) return null;
     
-    const success = await addCoins(finalReward, 'Scratch Reward', 'SPIN'); // Using SPIN type for now
-    if (success) {
-      logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${finalReward} coins (Base: ${reward}, Multiplier: ${multiplier.toFixed(1)}x)`);
+    try {
+      const response = await fetch('/api/rewards/scratch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.currentUser.id })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || "Failed to claim reward");
+        return null;
+      }
+      
+      const { reward, newCoins, newDailyEarned } = data;
+      
+      // Update local state
+      setState(prev => {
+        if (!prev.currentUser) return prev;
+        const updatedUser = {
+          ...prev.currentUser,
+          coins: newCoins,
+          dailyEarned: newDailyEarned,
+          scratchesToday: (prev.currentUser.scratchesToday || 0) + 1,
+          lastScratchTimestamp: Date.now(),
+          last_reward_time: Date.now()
+        };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+      
+      logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${reward} coins`);
+      return reward;
+    } catch (error) {
+      console.error("Error claiming scratch reward:", error);
+      alert("Network error. Please try again.");
+      return null;
     }
-    return success;
-  }, [state.currentUser, state.settings.rewardDelayMs, addCoins, logActivity]);
+  }, [state.currentUser, logActivity]);
+
+  const claimAdReward = useCallback(async (): Promise<number | null> => {
+    if (!state.currentUser) return null;
+    
+    try {
+      const response = await fetch('/api/rewards/ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.currentUser.id })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || "Failed to claim reward");
+        return null;
+      }
+      
+      const { reward, newCoins, newDailyEarned, newAdsWatchedToday } = data;
+      
+      // Update local state
+      setState(prev => {
+        if (!prev.currentUser) return prev;
+        const updatedUser = {
+          ...prev.currentUser,
+          coins: newCoins,
+          dailyEarned: newDailyEarned,
+          adsWatchedToday: newAdsWatchedToday,
+          lastAdTimestamp: Date.now(),
+          last_reward_time: Date.now()
+        };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+      
+      logActivity(state.currentUser.id, state.currentUser.name, 'VIDEO_WATCH', `Watched video for ${reward} coins`);
+      return reward;
+    } catch (error) {
+      console.error("Error claiming ad reward:", error);
+      alert("Network error. Please try again.");
+      return null;
+    }
+  }, [state.currentUser, logActivity]);
 
   const claimDailyCheckIn = useCallback(async (): Promise<boolean> => {
     if (!state.currentUser) return false;
-    const currentStreak = state.currentUser.streakDays || 0;
-    const currentDay = currentStreak + 1;
     
-    const baseReward = 5;
-    let reward = baseReward;
-    if (currentDay === 7) {
-      reward += 25; // Extra weekly bonus
-    }
-    
-    const success = await addCoins(reward, 'Daily Check-In', 'CHECKIN');
-    if (success) {
-      updateUser({ 
-        dailyRewardClaimed: true, 
-        streakDays: currentDay
+    try {
+      const response = await fetch('/api/rewards/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.currentUser.id })
       });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || "Failed to claim reward");
+        return false;
+      }
+      
+      const { reward, newCoins, newDailyEarned, currentDay } = data;
+      
+      // Update local state
+      setState(prev => {
+        if (!prev.currentUser) return prev;
+        const updatedUser = {
+          ...prev.currentUser,
+          coins: newCoins,
+          dailyEarned: newDailyEarned,
+          dailyRewardClaimed: true,
+          streakDays: currentDay,
+          last_reward_time: Date.now()
+        };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+      
       updateDeviceClaim(state.currentUser.deviceId, getServerTime());
       logActivity(state.currentUser.id, state.currentUser.name, 'DAILY_BONUS', `Claimed Day ${currentDay} reward (${reward} coins)`);
+      return true;
+    } catch (error) {
+      console.error("Error claiming daily check-in:", error);
+      alert("Network error. Please try again.");
+      return false;
     }
-    return success;
-  }, [state.currentUser, addCoins, updateUser, updateDeviceClaim, logActivity, getServerTime]);
+  }, [state.currentUser, updateDeviceClaim, logActivity, getServerTime]);
 
   const playAd = useCallback((onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => {
     if (state.currentUser?.status === UserStatus.SUSPENDED) {
@@ -647,9 +855,36 @@ const App: React.FC = () => {
 
     const isAdmin = supabaseUser?.role === 'admin' || user?.role === 'admin' || email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const persistentId = getPersistentDeviceId();
+    const fingerprint = await generateDeviceFingerprint();
+    const ipAddress = await getIpAddress();
     
     let isDeviceBlocked = false;
     let isWhitelisted = false;
+
+    // IP Address Monitoring
+    if (user) {
+      supabase.from('ip_logs').insert([{ user_id: user.id, ip_address: ipAddress }]).then(({ error }) => {
+        if (error) console.error("Failed to insert IP log", error);
+      });
+    }
+
+    const recentIpLogins = state.allUsers.filter(u => u.ip_address === ipAddress && u.createdAt && (Date.now() - u.createdAt < 24 * 60 * 60 * 1000)).length;
+    if (recentIpLogins > 5 && !isAdmin) {
+       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'IP_SPAM', `More than 5 accounts created from IP ${ipAddress} within 24 hours`);
+    }
+
+    // Emulator Detection
+    const emulatorDetected = isEmulator();
+    if (emulatorDetected && !isAdmin) {
+       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'EMULATOR_DETECTED', `Emulator usage detected`);
+    }
+
+    // Device Fingerprint System
+    const fingerprintAccounts = state.allUsers.filter(u => u.device_fingerprint === fingerprint).length;
+    if (fingerprintAccounts >= 3 && !isAdmin && (!user || user.device_fingerprint !== fingerprint)) {
+       isDeviceBlocked = true;
+       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'FINGERPRINT_SPAM', `More than 3 accounts using fingerprint ${fingerprint}`);
+    }
 
     if (!isAdmin && state.settings.deviceLimitEnabled) {
       try {
@@ -760,10 +995,16 @@ const App: React.FC = () => {
         referralHistory: [],
         deviceId: persistentId,
         deviceLimitBlocked: isDeviceBlocked,
-        lastIp: '192.168.1.' + Math.floor(Math.random() * 255),
+        lastIp: ipAddress,
         riskScore: 0,
         earningVelocity: 0,
-        lastActiveAt: Date.now()
+        lastActiveAt: Date.now(),
+        device_fingerprint: fingerprint,
+        ip_address: ipAddress,
+        is_suspicious: isDeviceBlocked || recentIpLogins > 5 || emulatorDetected,
+        fraud_score: 0,
+        last_reward_time: 0,
+        is_banned: false
       };
       setState(prev => {
         let updatedAllUsers = [...prev.allUsers, user!];
@@ -897,17 +1138,31 @@ const App: React.FC = () => {
 
         if (!existingUser) {
           // Create new user in Supabase
+          const fingerprint = await generateDeviceFingerprint();
+          const ipAddress = await getIpAddress();
+          const emulatorDetected = isEmulator();
+          
           const newUser = {
             id: user.id,
             email: email,
             role: 'user',
             coins: 0,
             referredBy: pendingReferralCode,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            device_fingerprint: fingerprint,
+            ip_address: ipAddress,
+            is_suspicious: emulatorDetected,
+            fraud_score: 0,
+            last_reward_time: 0,
+            is_banned: false
           };
           const { error: insertError } = await supabase.from('users').insert([newUser]);
           if (insertError) {
             console.error("Error inserting new user:", insertError);
+          } else {
+            supabase.from('ip_logs').insert([{ user_id: user.id, ip_address: ipAddress }]).then(({ error }) => {
+              if (error) console.error("Failed to insert IP log for new user", error);
+            });
           }
           loginRef.current(email, name, pendingReferralCode, newUser);
         } else {
@@ -937,6 +1192,12 @@ const App: React.FC = () => {
     const sharedDevice = state.allUsers.filter(u => u.deviceId === user.deviceId && u.id !== user.id).length;
     if (sharedDevice > 0) score += sharedDevice * 20;
 
+    // Check for shared Fingerprint
+    if (user.device_fingerprint) {
+      const sharedFingerprint = state.allUsers.filter(u => u.device_fingerprint === user.device_fingerprint && u.id !== user.id).length;
+      if (sharedFingerprint > 0) score += sharedFingerprint * 25;
+    }
+
     // Check for shared IP
     const sharedIp = state.allUsers.filter(u => u.lastIp === user.lastIp && u.id !== user.id).length;
     if (sharedIp > 0) score += sharedIp * 10;
@@ -949,6 +1210,14 @@ const App: React.FC = () => {
     const suspiciousReferrals = state.allUsers.filter(u => u.referredBy === user.referralCode && u.lastIp === user.lastIp).length;
     if (suspiciousReferrals > 0) score += suspiciousReferrals * 25;
 
+    // Account age factor (newer accounts have higher risk)
+    const accountAgeDays = (Date.now() - (user.createdAt || Date.now())) / (1000 * 60 * 60 * 24);
+    if (accountAgeDays < 7) score += 15;
+    else if (accountAgeDays < 30) score += 5;
+
+    // Suspicious flag
+    if (user.is_suspicious) score += 40;
+
     return Math.min(100, score);
   }, [state.allUsers, state.settings.dailyCapNormal, state.adminUsers]);
 
@@ -959,6 +1228,14 @@ const App: React.FC = () => {
     if (state.currentUser.walletFrozen) return "Your wallet is frozen.";
     if (state.currentUser.coins < amount) return "Insufficient balance";
     if (amount < state.settings.minWithdrawalCoins) return `Minimum withdrawal is ${state.settings.minWithdrawalCoins} coins.`;
+    
+    // Account Age Requirement
+    const accountAgeMs = Date.now() - (state.currentUser.createdAt || Date.now());
+    const minAgeMs = 72 * 60 * 60 * 1000;
+    if (accountAgeMs < minAgeMs && !state.isAdminSession) {
+      return "Your account must be at least 72 hours old to request a withdrawal.";
+    }
+
     const cooldownMs = (state.settings.withdrawalCooldownHours || 24) * 60 * 60 * 1000;
     const nextAllowed = (state.currentUser.lastWithdrawalTimestamp || 0) + cooldownMs;
     if (Date.now() < nextAllowed) return "Withdrawal Cooldown: Please wait before next request.";
@@ -981,8 +1258,8 @@ const App: React.FC = () => {
     let txMethod = `UPI: ${upiId} (Fee: ${feeAmount})`;
 
     // Withdrawal Risk Filter
+    const riskScore = calculateRiskScore(state.currentUser);
     if (state.settings.autoFlagWithdrawals && !state.isAdminSession && !state.currentUser.withdrawalFlagExempt) {
-      const riskScore = calculateRiskScore(state.currentUser);
       if (riskScore > 50) {
         txMethod += ' [FLAGGED: HIGH RISK]';
         logSuspiciousActivity(state.currentUser.id, state.currentUser.name, 'HIGH_RISK_WITHDRAWAL', `User with risk score ${riskScore} requested withdrawal of ${amount} coins.`);
@@ -990,6 +1267,9 @@ const App: React.FC = () => {
     }
 
     const now = Date.now();
+
+    // Update fraud_score in Supabase
+    await supabase.from('users').update({ fraud_score: riskScore }).eq('id', authUserId);
 
     // Insert into Supabase withdrawals table
     const { data: insertedData, error: insertError } = await supabase.from('withdrawals').insert([{
@@ -1015,7 +1295,7 @@ const App: React.FC = () => {
     const newTransactions = [tx, ...(state.currentUser.transactions || [])];
     
     // Do not deduct coins yet, just record the transaction and update lastWithdrawalTimestamp
-    updateUser({ transactions: newTransactions, upiId, lastWithdrawalTimestamp: now });
+    updateUser({ transactions: newTransactions, upiId, lastWithdrawalTimestamp: now, fraud_score: riskScore });
     
     logActivity(state.currentUser.id, state.currentUser.name, 'WITHDRAW_REQUEST', `Requested ₹${(finalAmount * COIN_TO_INR_RATE).toFixed(2)} to ${upiId} (Fee: ${feeAmount} coins)`);
     return null;
@@ -1060,204 +1340,250 @@ const App: React.FC = () => {
 
   const adminActions = {
     approveWithdrawal: async (userId: string, txId: string, paymentTxId?: string) => {
-      const user = state.allUsers.find(u => u.id === userId);
-      if (!user) return alert("User not found");
-      const tx = (user.transactions || []).find(t => t.id === txId);
-      if (!tx) return alert("Transaction not found");
-
-      const feeMatch = tx.method.match(/Fee: (\d+)/);
-      const feeAmount = feeMatch ? parseInt(feeMatch[1]) : 0;
-      const deductAmount = tx.amount + feeAmount;
-
-      if (user.coins < deductAmount) {
-        alert("User does not have enough coins to fulfill this withdrawal.");
-        return;
-      }
-
-      const newCoins = user.coins - deductAmount;
-
-      const newTransactions = (user.transactions || []).map(t => t.id === txId ? { ...t, status: 'COMPLETED' as const, paymentTxId } : t);
-
-      // Update Supabase users table
-      const { error: userUpdateError } = await supabase
-        .from('users')
-        .update({ coins: newCoins, transactions: newTransactions })
-        .eq('id', userId);
-
-      if (userUpdateError) {
-        console.error("Failed to deduct coins in Supabase", userUpdateError);
-        return alert("Failed to deduct coins. Please try again.");
-      }
-
-      // Update Supabase withdrawals table
-      const { error: withdrawalUpdateError } = await supabase
-        .from('withdrawals')
-        .update({ status: 'completed' })
-        .eq('id', txId)
-        .eq('user_id', userId);
-
-      if (withdrawalUpdateError) {
-        console.error("Failed to update withdrawal status in Supabase", withdrawalUpdateError);
-        // We might want to revert the coin deduction here, but for simplicity we'll just alert
-        alert("Failed to update withdrawal status. Coins were deducted.");
-      }
-
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== userId) return u;
-          return { 
-            ...u, 
-            coins: newCoins,
-            transactions: newTransactions
-          };
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'approveWithdrawal',
+            targetUserId: userId,
+            payload: { txId, paymentTxId }
+          })
         });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('PAYOUT_APPROVE', userId, `Approved payout ${txId}${paymentTxId ? ` (TxID: ${paymentTxId})` : ''}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to approve withdrawal');
+        }
+        const { newCoins, newTransactions } = await response.json();
+
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => {
+            if (u.id !== userId) return u;
+            return { 
+              ...u, 
+              coins: newCoins,
+              transactions: newTransactions
+            };
+          });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('PAYOUT_APPROVE', userId, `Approved payout ${txId}${paymentTxId ? ` (TxID: ${paymentTxId})` : ''}`);
+      } catch (error: any) {
+        console.error(error);
+        alert(error.message || 'Failed to approve withdrawal');
+      }
     },
     rejectWithdrawal: async (userId: string, txId: string, rejectionReason: string) => {
-      // Update Supabase withdrawals table
-      const { error: withdrawalUpdateError } = await supabase
-        .from('withdrawals')
-        .update({ status: 'rejected' })
-        .eq('id', txId)
-        .eq('user_id', userId);
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'rejectWithdrawal',
+            targetUserId: userId,
+            payload: { txId, rejectionReason }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to reject withdrawal');
+        }
+        const { newTransactions } = await response.json();
 
-      if (withdrawalUpdateError) {
-        console.error("Failed to update withdrawal status in Supabase", withdrawalUpdateError);
-        return alert("Failed to update withdrawal status. Please try again.");
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => {
+            if (u.id !== userId) return u;
+            return { 
+              ...u, 
+              transactions: newTransactions
+            };
+          });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('PAYOUT_REJECT', userId, `Rejected payout ${txId}. Reason: ${rejectionReason}`);
+      } catch (error: any) {
+        console.error(error);
+        alert(error.message || 'Failed to reject withdrawal');
       }
+    },
+    setWalletFrozen: async (userId: string, frozen: boolean, reason?: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'updateUserSettings',
+            targetUserId: userId,
+            payload: { updates: { walletFrozen: frozen } }
+          })
+        });
+        if (!response.ok) throw new Error('Failed to update wallet frozen status');
 
-      const user = state.allUsers.find(u => u.id === userId);
-      if (user) {
-        const newTransactions = (user.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t);
-        supabase.from('users').update({ transactions: newTransactions }).eq('id', userId).then(({ error }) => {
-          if (error) console.error("Failed to sync rejected transaction to Supabase", error);
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, walletFrozen: frozen });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
         });
+        logAdminAction(frozen ? 'WALLET_FREEZE' : 'WALLET_UNFREEZE', userId, reason || '');
+      } catch (error) {
+        console.error(error);
+        alert('Failed to update wallet frozen status');
       }
+    },
+    setUserStatus: async (userId: string, status: UserStatus, reason?: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'setUserStatus',
+            targetUserId: userId,
+            payload: { status, reason }
+          })
+        });
+        if (!response.ok) throw new Error('Failed to update user status');
+        
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, status, statusReason: reason });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('STATUS_OVERRIDE', userId, `Status set to ${status}`);
+      } catch (error) {
+        console.error(error);
+        alert('Failed to update user status');
+      }
+    },
+    modifyCoins: async (userId: string, amount: number, reason: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'modifyCoins',
+            targetUserId: userId,
+            payload: { amount, reason }
+          })
+        });
+        if (!response.ok) throw new Error('Failed to modify coins');
+        const { newCoins, newTransactions } = await response.json();
 
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== userId) return u;
-          // Do not add coins back since they were never deducted
-          return { 
-            ...u, 
-            transactions: (u.transactions || []).map(t => t.id === txId ? { ...t, status: 'REJECTED' as const, rejectionReason } : t) 
-          };
-        });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('PAYOUT_REJECT', userId, `Rejected payout ${txId}. Reason: ${rejectionReason}`);
-    },
-    setWalletFrozen: (userId: string, frozen: boolean, reason?: string) => {
-      supabase.from('users').update({ walletFrozen: frozen }).eq('id', userId).then(({ error }) => {
-        if (error) console.error("Failed to sync wallet frozen status to Supabase", error);
-      });
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, walletFrozen: frozen });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction(frozen ? 'WALLET_FREEZE' : 'WALLET_UNFREEZE', userId, reason || '');
-    },
-    setUserStatus: (userId: string, status: UserStatus, reason?: string) => {
-      supabase.from('users').update({ status, statusReason: reason }).eq('id', userId).then(({ error }) => {
-        if (error) console.error("Failed to sync user status to Supabase", error);
-      });
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, status, statusReason: reason });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('STATUS_OVERRIDE', userId, `Status set to ${status}`);
-    },
-    modifyCoins: (userId: string, amount: number, reason: string) => {
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== userId) return u;
-          const tx: Transaction = {
-            id: 'ADJ-' + Math.random().toString(36).substring(2, 9),
-            userId: u.id,
-            amount,
-            type: 'ADJUST',
-            method: reason,
-            status: 'COMPLETED',
-            timestamp: Date.now()
-          };
-          const newCoins = Math.max(0, u.coins + amount);
-          
-          // Sync to Supabase
-          const newTransactions = [tx, ...(u.transactions || [])];
-          supabase.from('users').update({ coins: newCoins, transactions: newTransactions }).eq('id', u.id).then(({ error }) => {
-            if (error) console.error("Failed to sync admin coin adjustment to Supabase", error);
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => {
+            if (u.id !== userId) return u;
+            return { ...u, coins: newCoins, transactions: newTransactions };
           });
-          
-          return { ...u, coins: newCoins, transactions: newTransactions };
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
         });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('COIN_ADJUST', userId, `Adjusted ${amount} coins. Reason: ${reason}`);
-    },
-    resetCooldowns: (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => {
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== userId) return u;
-          const updates: Partial<User> = {};
-          if (type === 'SPIN' || type === 'ALL') {
-             updates.spinsToday = 0;
-             updates.lastSpinTimestamp = 0;
-          }
-          if (type === 'SCRATCH' || type === 'ALL') {
-             updates.scratchesToday = 0;
-             updates.lastScratchTimestamp = 0;
-          }
-          
-          supabase.from('users').update(updates).eq('id', u.id).then(({ error }) => {
-            if (error) console.error("Failed to sync cooldown reset to Supabase", error);
-          });
-          
-          return { ...u, ...updates };
-        });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('RESET_COOLDOWN', userId, `Reset ${type} cooldown. Reason: ${reason}`);
-    },
-    resetStreak: (userId: string, reason: string) => {
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => {
-          if (u.id !== userId) return u;
-          const updates = { streakDays: 0, dailyRewardClaimed: false };
-          supabase.from('users').update(updates).eq('id', u.id).then(({ error }) => {
-            if (error) console.error("Failed to sync streak reset to Supabase", error);
-          });
-          return { ...u, ...updates };
-        });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('RESET_STREAK', userId, `Reset daily streak. Reason: ${reason}`);
-    },
-    updateUserSettings: (userId: string, updates: Partial<User>) => {
-      // Sync to Supabase
-      const supabaseUpdates: any = { ...updates };
-      delete supabaseUpdates.id;
-      delete supabaseUpdates.createdAt;
-      
-      if (Object.keys(supabaseUpdates).length > 0) {
-        supabase.from('users').update(supabaseUpdates).eq('id', userId).then(({ error }) => {
-          if (error) console.error("Failed to sync admin user settings update to Supabase", error);
-        });
+        logAdminAction('COIN_ADJUST', userId, `Adjusted ${amount} coins. Reason: ${reason}`);
+      } catch (error) {
+        console.error(error);
+        alert('Failed to modify coins');
       }
+    },
+    resetCooldowns: async (userId: string, type: 'SPIN' | 'SCRATCH' | 'ALL', reason: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'resetCooldowns',
+            targetUserId: userId,
+            payload: { type }
+          })
+        });
+        if (!response.ok) throw new Error('Failed to reset cooldowns');
+
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => {
+            if (u.id !== userId) return u;
+            const updates: Partial<User> = {};
+            if (type === 'SPIN' || type === 'ALL') {
+               updates.spinsToday = 0;
+               updates.lastSpinTimestamp = 0;
+            }
+            if (type === 'SCRATCH' || type === 'ALL') {
+               updates.scratchesToday = 0;
+               updates.lastScratchTimestamp = 0;
+            }
+            return { ...u, ...updates };
+          });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('RESET_COOLDOWN', userId, `Reset ${type} cooldown. Reason: ${reason}`);
+      } catch (error) {
+        console.error(error);
+        alert('Failed to reset cooldowns');
+      }
+    },
+    resetStreak: async (userId: string, reason: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'resetStreak',
+            targetUserId: userId,
+            payload: {}
+          })
+        });
+        if (!response.ok) throw new Error('Failed to reset streak');
+
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => {
+            if (u.id !== userId) return u;
+            const updates = { streakDays: 0, dailyRewardClaimed: false };
+            return { ...u, ...updates };
+          });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('RESET_STREAK', userId, `Reset daily streak. Reason: ${reason}`);
+      } catch (error) {
+        console.error(error);
+        alert('Failed to reset streak');
+      }
+    },
+    updateUserSettings: async (userId: string, updates: Partial<User>) => {
+      try {
+        const supabaseUpdates: any = { ...updates };
+        delete supabaseUpdates.id;
+        delete supabaseUpdates.createdAt;
+        
+        if (Object.keys(supabaseUpdates).length > 0) {
+          const response = await fetch('/api/admin/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminId: state.currentUser?.id,
+              action: 'updateUserSettings',
+              targetUserId: userId,
+              payload: { updates: supabaseUpdates }
+            })
+          });
+          if (!response.ok) throw new Error('Failed to update user settings');
+        }
 
       setState(prev => {
         const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, ...updates });
         const updated = newAllUsers.find(u => u.id === userId);
         return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
       });
+      } catch (error) {
+        console.error(error);
+        alert('Failed to update user settings');
+      }
     },
     impersonateUser: (userId: string) => {
       const user = state.allUsers.find(u => u.id === userId);
@@ -1265,20 +1591,42 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, currentUser: user }));
       setActiveTab('home');
     },
-    clearDeviceLimitForUser: (userId: string) => {
-      supabase.from('users').update({ deviceLimitExempt: true }).eq('id', userId).then(({ error }) => {
-        if (error) console.error("Failed to sync device limit exemption to Supabase", error);
-      });
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, deviceLimitExempt: true });
-        const updated = newAllUsers.find(u => u.id === userId);
-        return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
-      });
-      logAdminAction('DEVICE_LIMIT_EXEMPT', userId, 'Exempted user from device limits');
+    clearDeviceLimitForUser: async (userId: string) => {
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'resetDeviceLimits',
+            targetUserId: userId,
+            payload: {}
+          })
+        });
+        if (!response.ok) throw new Error('Failed to reset device limits');
+
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => u.id !== userId ? u : { ...u, deviceLimitExempt: true });
+          const updated = newAllUsers.find(u => u.id === userId);
+          return { ...prev, allUsers: newAllUsers, currentUser: prev.currentUser?.id === userId ? (updated || null) : prev.currentUser };
+        });
+        logAdminAction('DEVICE_LIMIT_EXEMPT', userId, 'Exempted user from device limits');
+      } catch (error) {
+        console.error(error);
+        alert('Failed to reset device limits');
+      }
     },
     clearDeviceLimitForDevice: async (deviceId: string) => {
       try {
-        await supabase.from('devices').update({ is_whitelisted: true }).eq('device_id', deviceId);
+        await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'clearDeviceLimitForDevice',
+            payload: { deviceId }
+          })
+        });
       } catch (err) {
         console.error("Failed to whitelist device in Supabase", err);
       }
@@ -1291,7 +1639,15 @@ const App: React.FC = () => {
     },
     removeDeviceExemption: async (deviceId: string) => {
       try {
-        await supabase.from('devices').update({ is_whitelisted: false }).eq('device_id', deviceId);
+        await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'removeDeviceExemption',
+            payload: { deviceId }
+          })
+        });
       } catch (err) {
         console.error("Failed to un-whitelist device in Supabase", err);
       }
@@ -1303,8 +1659,15 @@ const App: React.FC = () => {
     },
     resetDeviceRestrictions: async () => {
       try {
-        await supabase.from('devices').update({ account_count: 0, is_whitelisted: false }).neq('device_id', '');
-        await supabase.from('users').update({ deviceLimitExempt: false, deviceLimitBlocked: false, customDeviceLimit: null }).neq('id', '');
+        await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'resetDeviceRestrictions',
+            payload: {}
+          })
+        });
       } catch (err) {
         console.error("Failed to reset devices in Supabase", err);
       }
@@ -1316,32 +1679,54 @@ const App: React.FC = () => {
       logAdminAction('DEVICE_LIMIT_RESET', 'SYSTEM', 'Reset all device limit exemptions globally');
     },
     unbindDeviceForUser: async (userId: string) => {
-      const user = state.allUsers.find(u => u.id === userId);
-      if (user && user.deviceId) {
-        try {
-          // Decrement account count in Supabase
-          const { data: deviceData } = await supabase.from('devices').select('account_count').eq('device_id', user.deviceId).single();
-          if (deviceData && deviceData.account_count > 0) {
-            await supabase.from('devices').update({ account_count: deviceData.account_count - 1 }).eq('device_id', user.deviceId);
+      try {
+        const response = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'updateUserSettings',
+            targetUserId: userId,
+            payload: { updates: { deviceId: null, deviceLimitBlocked: false } }
+          })
+        });
+        if (!response.ok) throw new Error('Failed to unbind device');
+
+        const user = state.allUsers.find(u => u.id === userId);
+        if (user && user.deviceId) {
+          try {
+            // Decrement account count in Supabase
+            const { data: deviceData } = await supabase.from('devices').select('account_count').eq('device_id', user.deviceId).single();
+            if (deviceData && deviceData.account_count > 0) {
+              await supabase.from('devices').update({ account_count: deviceData.account_count - 1 }).eq('device_id', user.deviceId);
+            }
+          } catch (err) {
+            console.error("Failed to decrement device account count in Supabase", err);
           }
-        } catch (err) {
-          console.error("Failed to decrement device account count in Supabase", err);
         }
+
+        setState(prev => {
+          const newAllUsers = prev.allUsers.map(u => u.id === userId ? { ...u, deviceId: undefined, deviceLimitBlocked: false } : u);
+          const newCurrentUser = prev.currentUser?.id === userId ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false } : prev.currentUser;
+          return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
+        });
+        logAdminAction('DEVICE_UNBIND', userId, 'Unbound device from user');
+      } catch (error) {
+        console.error(error);
+        alert('Failed to unbind device');
       }
-      supabase.from('users').update({ deviceId: null, deviceLimitBlocked: false }).eq('id', userId).then(({ error }) => {
-        if (error) console.error("Failed to sync device unbind to Supabase", error);
-      });
-      setState(prev => {
-        const newAllUsers = prev.allUsers.map(u => u.id === userId ? { ...u, deviceId: undefined, deviceLimitBlocked: false } : u);
-        const newCurrentUser = prev.currentUser?.id === userId ? { ...prev.currentUser, deviceId: undefined, deviceLimitBlocked: false } : prev.currentUser;
-        return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
-      });
-      logAdminAction('DEVICE_UNBIND', userId, 'Unbound device from user');
     },
     unbindAllDevices: async () => {
       try {
-        await supabase.from('devices').update({ account_count: 0 }).neq('device_id', '');
-        await supabase.from('users').update({ deviceId: null, deviceLimitBlocked: false, deviceLimitExempt: false, customDeviceLimit: null }).neq('id', '');
+        await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId: state.currentUser?.id,
+            action: 'unbindAllDevices',
+            payload: {}
+          })
+        });
       } catch (err) {
         console.error("Failed to unbind all devices in Supabase", err);
       }
@@ -1410,7 +1795,7 @@ const App: React.FC = () => {
   return (
     <AppContext.Provider value={{
       state, isDeviceLimitReached, getServerTime, updateUser, updateLogo, updateSettings, addCoins, 
-      claimSpinReward, claimScratchReward, claimDailyCheckIn,
+      claimSpinReward, claimScratchReward, claimAdReward, claimDailyCheckIn,
       playAd, login, logout, 
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, logSuspiciousActivity, updateDeviceClaim, adminActions

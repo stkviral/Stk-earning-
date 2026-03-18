@@ -41,6 +41,31 @@ CREATE TABLE IF NOT EXISTS public.users (
   "lastActiveAt" BIGINT,
   "lastIp" TEXT,
   "upiId" TEXT,
+  "device_fingerprint" TEXT,
+  "ip_address" TEXT,
+  "is_suspicious" BOOLEAN DEFAULT false,
+  "fraud_score" INTEGER DEFAULT 0,
+  "last_reward_time" BIGINT DEFAULT 0,
+  "is_banned" BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create ip_logs table
+CREATE TABLE IF NOT EXISTS public.ip_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) NOT NULL,
+  ip_address TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create reward_logs table
+CREATE TABLE IF NOT EXISTS public.reward_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) NOT NULL,
+  action_type TEXT NOT NULL,
+  reward_amount INTEGER NOT NULL,
+  device_fingerprint TEXT,
+  ip_address TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -65,6 +90,8 @@ CREATE TABLE IF NOT EXISTS public.devices (
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ip_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reward_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for users table
 CREATE POLICY "Users can view their own profile" ON public.users FOR SELECT USING (auth.uid() = id);
@@ -95,3 +122,17 @@ CREATE POLICY "Admins can update all withdrawals" ON public.withdrawals FOR UPDA
 CREATE POLICY "Anyone can view devices" ON public.devices FOR SELECT USING (true);
 CREATE POLICY "Anyone can insert devices" ON public.devices FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anyone can update devices" ON public.devices FOR UPDATE USING (true);
+
+-- Create policies for ip_logs table
+CREATE POLICY "Users can view their own ip_logs" ON public.ip_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own ip_logs" ON public.ip_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can view all ip_logs" ON public.ip_logs FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- Create policies for reward_logs table
+CREATE POLICY "Users can view their own reward_logs" ON public.reward_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own reward_logs" ON public.reward_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can view all reward_logs" ON public.reward_logs FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);

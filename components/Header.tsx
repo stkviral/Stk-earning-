@@ -44,11 +44,30 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
 
   const currentBalanceINR = displayedCoins * COIN_TO_INR_RATE;
 
+  const [logoTaps, setLogoTaps] = useState(0);
+
+  useEffect(() => {
+    if (logoTaps >= 5) {
+      if (isAdmin || currentUser?.role === 'admin' || currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        setActiveTab('admin');
+        setLogoTaps(0);
+      }
+    }
+  }, [logoTaps, isAdmin, currentUser, setActiveTab]);
+
+  const handleLogoTap = () => {
+    setLogoTaps(prev => prev + 1);
+    setTimeout(() => setLogoTaps(0), 3000); // Reset after 3 seconds
+  };
+
   return (
     <header className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white p-4 z-[100] relative overflow-hidden transition-all duration-300 border-b border-gray-100 dark:border-gray-800">
       <div className="flex justify-between items-center relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full border-2 border-gray-100 dark:border-gray-800 overflow-hidden bg-gray-50 dark:bg-gray-800 flex items-center justify-center shrink-0 shadow-sm z-10">
+          <div 
+            onClick={handleLogoTap}
+            className="w-12 h-12 rounded-full border-2 border-gray-100 dark:border-gray-800 overflow-hidden bg-gray-50 dark:bg-gray-800 flex items-center justify-center shrink-0 shadow-sm z-10 cursor-pointer"
+          >
             {isAdmin ? (
                <ShieldAlert className="w-6 h-6 text-red-500" />
             ) : (
@@ -73,14 +92,6 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 {displayedCoins.toFixed(1)}
               </span>
             </div>
-          )}
-          {(currentUser?.role === 'admin' || currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) && (
-            <button 
-              onClick={() => { playSound('tap'); setActiveTab('admin'); }}
-              className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-90 text-gray-600 dark:text-gray-300"
-            >
-              <ShieldCheck size={20} />
-            </button>
           )}
           <button 
             onClick={() => { playSound('tap'); toggleTheme(); }}

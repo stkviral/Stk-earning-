@@ -4,7 +4,7 @@ import { useApp } from '../App';
 import { PlayCircle, Zap, TrendingUp, History, Coins, ArrowRight, ShieldCheck, Activity, Flame, Sparkles, ZapOff, ShieldOff, AlertTriangle } from 'lucide-react';
 
 const Videos: React.FC = () => {
-  const { state, isDeviceLimitReached, getServerTime, playAd, addCoins, updateUser, logActivity } = useApp();
+  const { state, isDeviceLimitReached, getServerTime, playAd, claimAdReward } = useApp();
   const { currentUser, isAdBlockerActive, settings } = state;
   const [timeLeft, setTimeLeft] = useState(0);
   const [adError, setAdError] = useState(false);
@@ -21,7 +21,7 @@ const Videos: React.FC = () => {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [currentUser?.lastAdTimestamp, getServerTime]);
+  }, [currentUser?.lastAdTimestamp, getServerTime, settings.adCooldownMinutes]);
 
   if (!currentUser) return null;
 
@@ -50,14 +50,7 @@ const Videos: React.FC = () => {
     }
 
     const claimReward = async () => {
-      const success = await addCoins(finalReward, 'Video Watch');
-      if (success) {
-        updateUser({
-          adsWatchedToday: (currentUser.adsWatchedToday || 0) + 1,
-          lastAdTimestamp: getServerTime()
-        });
-        logActivity(currentUser.id, currentUser.name, 'VIDEO_WATCH', `Watched video for ${finalReward} coins (Base: ${settings.adRewardCoins}, Multiplier: ${multiplier.toFixed(1)}x)`);
-      }
+      await claimAdReward();
     };
 
     const handleError = () => {

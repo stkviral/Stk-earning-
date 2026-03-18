@@ -233,6 +233,14 @@ const UserDetailView: React.FC<{ user: User; onBack: () => void }> = ({ user, on
                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Last Known IP</p>
                    <p className="text-sm font-mono text-gray-300">{user.lastIp || 'N/A'}</p>
                 </div>
+                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
+                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Device Fingerprint</p>
+                   <p className="text-sm font-mono text-gray-300 break-all">{user.device_fingerprint || 'N/A'}</p>
+                </div>
+                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
+                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Suspicious Flag</p>
+                   <p className={`text-sm font-bold ${user.is_suspicious ? 'text-red-500' : 'text-green-500'}`}>{user.is_suspicious ? 'YES' : 'NO'}</p>
+                </div>
              </div>
              <div className="bg-gray-950 p-6 rounded-xl border border-gray-800 flex items-center justify-between mt-6">
                 <div>
@@ -333,7 +341,7 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
   const allWithdrawals = useMemo(() => state.allUsers.flatMap(user => 
     (user.transactions || [])
       .filter(tx => (tx.type === 'WITHDRAW' || tx.type === 'WITHDRAWAL'))
-      .map(tx => ({ ...tx, userId: user.id, userName: user.name, userEmail: user.email }))
+      .map(tx => ({ ...tx, userId: user.id, userName: user.name, userEmail: user.email, riskScore: user.fraud_score || 0, isSuspicious: user.is_suspicious }))
   ).sort((a, b) => b.timestamp - a.timestamp), [state.allUsers]);
 
   const payouts = useMemo(() => allWithdrawals
@@ -375,6 +383,7 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
                <thead>
                   <tr className="bg-gray-950 border-b border-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                      <th className="p-4">User</th>
+                     <th className="p-4">Risk</th>
                      <th className="p-4">Method</th>
                      <th className="p-4">Amount</th>
                      <th className="p-4">Date</th>
@@ -384,15 +393,21 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
                <tbody className="divide-y divide-gray-800">
                   {payouts.length === 0 ? (
                      <tr>
-                        <td colSpan={5} className="p-8 text-center text-gray-500 text-sm">No {filter.toLowerCase()} payouts found.</td>
+                        <td colSpan={6} className="p-8 text-center text-gray-500 text-sm">No {filter.toLowerCase()} payouts found.</td>
                      </tr>
                   ) : (
                      payouts.map(tx => (
                         <tr key={tx.id} className="hover:bg-gray-800/30 transition-colors">
                            <td className="p-4">
-                              <button onClick={() => setViewingUserId(tx.userId)} className="text-blue-400 hover:text-blue-300 font-medium text-sm text-left">
+                              <button onClick={() => setViewingUserId(tx.userId)} className="text-blue-400 hover:text-blue-300 font-medium text-sm text-left flex items-center gap-2">
                                  {tx.userName}
+                                 {tx.isSuspicious && <ShieldAlert size={14} className="text-red-500" />}
                               </button>
+                           </td>
+                           <td className="p-4">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${tx.riskScore > 70 ? 'bg-red-500/10 text-red-500' : tx.riskScore > 30 ? 'bg-yellow-500/10 text-yellow-500' : 'bg-green-500/10 text-green-500'}`}>
+                                 {tx.riskScore}/100
+                              </span>
                            </td>
                            <td className="p-4 text-sm text-gray-300">{tx.method}</td>
                            <td className="p-4">
@@ -519,6 +534,28 @@ const AdminPanel: React.FC = () => {
                
                {activeTab === 'dashboard' && (
                   <div className="space-y-6">
+                     {/* Alerts Section */}
+                     {state.suspiciousActivityLogs.length > 0 && (
+                        <div className="bg-red-900/20 border border-red-800/50 p-4 rounded-2xl shadow-lg">
+                           <div className="flex items-center gap-2 mb-3">
+                              <ShieldAlert className="text-red-500" size={20} />
+                              <h3 className="text-sm font-bold text-red-400">Security Alerts</h3>
+                           </div>
+                           <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                              {state.suspiciousActivityLogs.slice(0, 5).map(log => (
+                                 <div key={log.id} className="bg-gray-950/50 p-2 rounded-lg border border-red-900/30 flex justify-between items-start">
+                                    <div>
+                                       <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">{log.reason}</span>
+                                       <p className="text-xs text-gray-300 mt-0.5">{log.details}</p>
+                                       <p className="text-[10px] text-gray-500 mt-1">User: {log.userName}</p>
+                                    </div>
+                                    <span className="text-[10px] text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+                     )}
+
                      <div>
                         <h2 className="text-xl font-bold text-white mb-4">Overview</h2>
                         <div className="grid grid-cols-2 gap-4">
@@ -621,7 +658,10 @@ const AdminPanel: React.FC = () => {
                               <div className="flex items-center gap-3">
                                  <img src={u.avatar} className="w-10 h-10 rounded-lg border border-gray-700" />
                                  <div>
-                                    <p className="text-sm font-semibold text-white">{u.name}</p>
+                                    <p className="text-sm font-semibold text-white flex items-center gap-2">
+                                       {u.name}
+                                       {u.is_suspicious && <ShieldAlert size={14} className="text-red-500" />}
+                                    </p>
                                     <div className="flex items-center gap-2 mt-0.5">
                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${u.status === UserStatus.ACTIVE ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                                           {u.status}
@@ -817,10 +857,14 @@ const AdminPanel: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                            <div>
+                              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Daily Earning Cap (Per User)</label>
+                              <input type="number" value={state.settings.dailyCapNormal ?? 200} onChange={e => updateSettings({ dailyCapNormal: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-yellow-500" />
+                           </div>
+                           <div>
                               <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Daily Coin Issue Limit</label>
                               <input type="number" value={state.settings.dailyRewardBudget ?? 0} onChange={e => updateSettings({ dailyRewardBudget: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-yellow-500" />
                            </div>
-                           <div className="flex items-center justify-between bg-gray-950 border border-gray-800 p-2 rounded-lg">
+                           <div className="col-span-2 flex items-center justify-between bg-gray-950 border border-gray-800 p-2 rounded-lg">
                               <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Auto Balancing</label>
                               <button onClick={() => updateSettings({ autoRewardBalancing: !state.settings.autoRewardBalancing })} className={`w-10 h-5 rounded-full transition-all relative ${state.settings.autoRewardBalancing ? 'bg-yellow-500' : 'bg-gray-700'}`}>
                                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${state.settings.autoRewardBalancing ? 'left-5.5' : 'left-0.5'}`} />
@@ -843,6 +887,10 @@ const AdminPanel: React.FC = () => {
                            <div>
                               <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Max Withdrawal</label>
                               <input type="number" value={state.settings.maxWithdrawalCoins ?? 0} onChange={e => updateSettings({ maxWithdrawalCoins: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-blue-400" />
+                           </div>
+                           <div className="col-span-2">
+                              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Withdrawal Cooldown (hours)</label>
+                              <input type="number" value={state.settings.withdrawalCooldownHours ?? 24} onChange={e => updateSettings({ withdrawalCooldownHours: parseInt(e.target.value) || 0 })} className="w-full bg-gray-950 border border-gray-800 p-2 rounded-lg text-sm text-white outline-none focus:border-blue-400" />
                            </div>
                            <div className="col-span-2 flex items-center justify-between bg-gray-950 border border-gray-800 p-3 rounded-lg">
                               <div>

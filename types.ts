@@ -109,6 +109,12 @@ export interface User {
   rewardLimitExempt?: boolean;
   withdrawalFlagExempt?: boolean;
   fraudDetectionExempt?: boolean;
+  device_fingerprint?: string;
+  ip_address?: string;
+  is_suspicious?: boolean;
+  fraud_score?: number;
+  last_reward_time?: number;
+  is_banned?: boolean;
 }
 
 export interface AppSettings {

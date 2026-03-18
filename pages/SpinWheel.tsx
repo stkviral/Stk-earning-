@@ -81,91 +81,66 @@ const SpinWheel: React.FC = () => {
     playSound('tap');
     setLastReward(null);
     setWinningSegmentIndex(null);
-    setIsWobbling(true);
 
-    // Deduct spin immediately to prevent refresh exploits
-    updateUser({
-      spinsToday: (currentUser.spinsToday || 0) + 1,
-      lastSpinTimestamp: getServerTime()
-    });
+    const executeSpin = async () => {
+      setIsWobbling(true);
 
-    setTimeout(() => {
-      setIsWobbling(false);
-      setSpinning(true);
-      playSound('ignite');
-      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      
-      // Use probability weights to select reward
-      let totalWeight = 0;
-      const weights = settings.spinRewards.map(reward => {
-        const weight = settings.spinProbabilities[reward.toString()] || 1;
-        totalWeight += weight;
-        return weight;
-      });
-      
-      let randomNum = Math.random() * totalWeight;
-      let selectedRewardIndex = 0;
-      for (let i = 0; i < weights.length; i++) {
-        randomNum -= weights[i];
-        if (randomNum <= 0) {
-          selectedRewardIndex = i;
-          break;
-        }
+      // Call API to get reward
+      const reward = await claimSpinReward();
+      if (reward === null) {
+        setIsWobbling(false);
+        return;
       }
 
-      const segmentIndex = selectedRewardIndex;
-      const segmentAngle = 360 / settings.spinRewards.length;
-      const extraRotations = 15 * 360; // Increased rotations for a longer, more dramatic spin
-      const currentAngleOffset = rotation % 360;
-      const randomOffset = (Math.random() * 0.8 - 0.4) * segmentAngle; // +/- 40% of segment
-      const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2) + randomOffset;
-      const newRotation = rotation + extraRotations + (finalSegmentAngle - currentAngleOffset);
-      
-      setRotation(newRotation);
+      // Find segment index for the reward
+      let segmentIndex = settings.spinRewards.indexOf(reward);
+      if (segmentIndex === -1) {
+        // If reward is not in the wheel (e.g. 0), pick the closest or 0
+        segmentIndex = settings.spinRewards.indexOf(0);
+        if (segmentIndex === -1) segmentIndex = 0;
+      }
 
-      // Wheel stops
       setTimeout(() => {
-        setSpinning(false);
-        playSound('complete');
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        setIsWobbling(false);
+        setSpinning(true);
+        playSound('ignite');
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
         
-        const completeSpin = () => {
+        const segmentAngle = 360 / settings.spinRewards.length;
+        const extraRotations = 15 * 360; // Increased rotations for a longer, more dramatic spin
+        const currentAngleOffset = rotation % 360;
+        const randomOffset = (Math.random() * 0.8 - 0.4) * segmentAngle; // +/- 40% of segment
+        const finalSegmentAngle = (settings.spinRewards.length - segmentIndex) * segmentAngle - (segmentAngle / 2) + randomOffset;
+        const newRotation = rotation + extraRotations + (finalSegmentAngle - currentAngleOffset);
+        
+        setRotation(newRotation);
+
+        // Wheel stops
+        setTimeout(() => {
+          setSpinning(false);
+          playSound('complete');
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          
           setWinningSegmentIndex(segmentIndex);
-          setLastReward(settings.spinRewards[segmentIndex]);
+          setLastReward(reward);
           setIsAdPending(false);
-          logActivity(currentUser.id, currentUser.name, 'SPIN_RESULT', `Won ${settings.spinRewards[segmentIndex]} coins from wheel`);
-        };
-
-        if (settings.spinAdRequired) {
-          setIsAdPending(true);
-          playAd(completeSpin, 'REQUIRED', () => setIsAdPending(false));
-        } else {
-          completeSpin();
-        }
-      }, 5000); // Matched with the new CSS transition duration
-    }, 600);
-  };
-
-  const handleClaimReward = () => {
-    if (lastReward === null || isAdBlockerActive || isAdPending) return;
-
-    const claim = async () => {
-      setIsAdPending(true);
-      const success = await claimSpinReward(lastReward!);
-      if (success) {
-        playSound('collect');
-        setLastReward(null);
-        setWinningSegmentIndex(null);
-      }
-      setIsAdPending(false);
+        }, 5000); // Matched with the new CSS transition duration
+      }, 600);
     };
 
     if (settings.spinAdRequired) {
       setIsAdPending(true);
-      playAd(claim, 'REQUIRED', () => setIsAdPending(false));
+      playAd(executeSpin, 'REQUIRED', () => setIsAdPending(false));
     } else {
-      claim();
+      executeSpin();
     }
+  };
+
+  const handleClaimReward = () => {
+    if (lastReward === null || isAdBlockerActive || isAdPending) return;
+    playSound('collect');
+    setLastReward(null);
+    setWinningSegmentIndex(null);
   };
 
   const handleUnlockExtraSpin = () => {

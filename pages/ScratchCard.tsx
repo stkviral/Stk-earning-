@@ -84,7 +84,7 @@ const ScratchCard: React.FC = () => {
   const maxScratches = settings.maxDailyScratchesNormal;
   const remainingScratches = maxScratches - (currentUser.scratchesToday || 0);
 
-  const handleStartScratch = () => {
+  const handleStartScratch = async () => {
     if (isDeviceLimitReached) {
       alert("Maximum accounts reached on this device");
       return;
@@ -106,34 +106,34 @@ const ScratchCard: React.FC = () => {
 
     if (isAdPending) return;
 
-    // Select reward
-    let totalWeight = 0;
-    const weights = settings.scratchRewards.map(r => {
-      const weight = settings.scratchProbabilities[r.toString()] || 1;
-      totalWeight += weight;
-      return weight;
-    });
-    
-    let randomNum = Math.random() * totalWeight;
-    let selectedRewardIndex = 0;
-    for (let i = 0; i < weights.length; i++) {
-      randomNum -= weights[i];
-      if (randomNum <= 0) {
-        selectedRewardIndex = i;
-        break;
+    const executeScratch = async () => {
+      // Call API to get reward
+      const apiReward = await claimScratchReward();
+      if (apiReward === null) return;
+
+      setReward(apiReward);
+      setIsRevealed(false);
+      setScratchedPercentage(0);
+      playSound('tap');
+      
+      // Reset canvas
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = '#9ca3af'; // Gray-400
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
       }
+    };
+
+    if (settings.scratchAdRequired) {
+      setIsAdPending(true);
+      playAd(executeScratch, 'REQUIRED', () => setIsAdPending(false));
+    } else {
+      executeScratch();
     }
-
-    setReward(settings.scratchRewards[selectedRewardIndex]);
-    setIsRevealed(false);
-    setScratchedPercentage(0);
-    playSound('tap');
-
-    // Deduct scratch immediately to prevent refresh exploits
-    updateUser({
-      scratchesToday: (currentUser.scratchesToday || 0) + 1,
-      lastScratchTimestamp: getServerTime()
-    });
   };
 
   const scratch = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -213,24 +213,9 @@ const ScratchCard: React.FC = () => {
 
   const handleClaimReward = () => {
     if (reward === null || isAdBlockerActive || isAdPending) return;
-
-    const claim = async () => {
-      setIsAdPending(true);
-      const success = await claimScratchReward(reward!);
-      if (success) {
-        playSound('collect');
-        setReward(null);
-        setIsRevealed(false);
-      }
-      setIsAdPending(false);
-    };
-
-    if (settings.scratchAdRequired) {
-      setIsAdPending(true);
-      playAd(claim, 'REQUIRED', () => setIsAdPending(false));
-    } else {
-      claim();
-    }
+    playSound('collect');
+    setReward(null);
+    setIsRevealed(false);
   };
 
   const handleUnlockExtraScratch = () => {
