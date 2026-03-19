@@ -161,7 +161,7 @@ const FAQ: React.FC = () => {
       </button>
 
       <div className="text-center pt-8 border-t border-gray-100 dark:border-gray-900">
-         <p className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em]">STK EARNING SUPPORT</p>
+         <p className="text-[8px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em]">STK PLAY SUPPORT</p>
       </div>
     </div>
   );

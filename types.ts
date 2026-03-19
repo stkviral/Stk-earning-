@@ -25,7 +25,7 @@ export interface Transaction {
   id: string;
   userId: string;
   amount: number;
-  type: 'SPIN' | 'CHECKIN' | 'WITHDRAWAL' | 'AD' | 'REFERRAL' | 'ADJUST';
+  type: 'SPIN' | 'CHECKIN' | 'WITHDRAWAL' | 'AD' | 'REFERRAL' | 'ADJUST' | 'SCRATCH';
   method: string;
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
   timestamp: number;

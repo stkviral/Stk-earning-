@@ -84,7 +84,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   referralsEnabled: true,
   adsEnabled: true,
   withdrawalsEnabled: true,
-  systemNotification: "Welcome to STK Earning!",
+  systemNotification: "Welcome to STK PLAY– EARN COIN'S & REWARD'S!",
   appVersion: "1.0.0",
   minVersionRequired: "1.0.0",
   dailyCapNormal: 200,
@@ -135,7 +135,7 @@ const getPersistentDeviceId = () => {
 const isEmulator = () => {
   const ua = navigator.userAgent.toLowerCase();
   if (ua.includes('bluestacks') || ua.includes('nox') || ua.includes('memu') || ua.includes('ldplayer') || ua.includes('emulator')) return true;
-  if (navigator.hardwareConcurrency === undefined || navigator.deviceMemory === undefined) return true;
+  if (navigator.hardwareConcurrency === undefined || (navigator as any).deviceMemory === undefined) return true;
   if (window.navigator.webdriver) return true;
   return false;
 };
@@ -149,7 +149,7 @@ const generateDeviceFingerprint = async () => {
       screen.width + 'x' + screen.height,
       new Date().getTimezoneOffset(),
       navigator.hardwareConcurrency,
-      navigator.deviceMemory,
+      (navigator as any).deviceMemory,
       navigator.platform
     ];
     const stringToHash = components.join('|');

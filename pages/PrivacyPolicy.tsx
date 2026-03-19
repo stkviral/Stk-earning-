@@ -57,7 +57,7 @@ const PrivacyPolicy: React.FC = () => {
         <Section 
           icon={<UserCheck size={22} />}
           title="How We Use Data"
-          content="Data is utilized for asset management, referral tracking, security checks, and payment processing. Your data remains within the STK Earning Platform and is never sold to external entities."
+          content="Data is utilized for asset management, referral tracking, security checks, and payment processing. Your data remains within the STK PLAY Platform and is never sold to external entities."
         />
 
         <Section 
@@ -82,7 +82,7 @@ const PrivacyPolicy: React.FC = () => {
       <div className="text-center pt-10 border-t border-gray-100 dark:border-gray-900">
         <p className="text-[9px] text-gray-400 dark:text-gray-600 font-black uppercase tracking-[0.4em] leading-relaxed">
           By using this app, you agree to our privacy policy.<br/>
-          STK NETWORK © 2024
+          STK PLAY NETWORK © 2024
         </p>
       </div>
     </div>

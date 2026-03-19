@@ -302,7 +302,6 @@ app.post("/api/admin/action", async (req, res) => {
       }
 
       // Check cooldown (5 seconds)
-      const now = Date.now();
       const lastSpin = user.lastSpinTimestamp || 0;
       if (now - lastSpin < 5000) {
         return res.status(429).json({ error: "Spin Cooldown: Please wait 5 seconds." });
@@ -399,7 +398,6 @@ app.post("/api/admin/action", async (req, res) => {
         return res.status(403).json({ error: "Daily earning limit reached. Come back tomorrow." });
       }
 
-      const now = Date.now();
       const lastScratch = user.lastScratchTimestamp || 0;
       if (now - lastScratch < 5000) {
         return res.status(429).json({ error: "Scratch Cooldown: Please wait 5 seconds." });
@@ -492,7 +490,6 @@ app.post("/api/admin/action", async (req, res) => {
         return res.status(403).json({ error: "Daily ad limit reached." });
       }
 
-      const now = Date.now();
       const lastAd = user.lastAdTimestamp || 0;
       if (now - lastAd < 10000) {
         return res.status(429).json({ error: "Ad Cooldown: Please wait 10 seconds." });

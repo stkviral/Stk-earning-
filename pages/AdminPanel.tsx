@@ -534,6 +534,23 @@ const AdminPanel: React.FC = () => {
                
                {activeTab === 'dashboard' && (
                   <div className="space-y-6">
+                     {/* Link to Supabase Admin Panel */}
+                     <div className="bg-blue-900/20 border border-blue-800/50 p-4 rounded-2xl shadow-lg flex items-center justify-between">
+                        <div>
+                           <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+                              <ShieldCheck size={18} />
+                              Supabase Admin Panel
+                           </h3>
+                           <p className="text-xs text-gray-400 mt-1">Manage users, roles, and devices directly in Supabase.</p>
+                        </div>
+                        <button 
+                           onClick={() => window.location.href = '/admin'}
+                           className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors"
+                        >
+                           Open
+                        </button>
+                     </div>
+
                      {/* Alerts Section */}
                      {state.suspiciousActivityLogs.length > 0 && (
                         <div className="bg-red-900/20 border border-red-800/50 p-4 rounded-2xl shadow-lg">

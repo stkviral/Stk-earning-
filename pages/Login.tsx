@@ -147,7 +147,7 @@ const Login: React.FC = () => {
       </div>
       
       <div className="text-center space-y-2 mb-6 relative z-10">
-        <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">STK Earning</h1>
+        <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">STK PLAY</h1>
         <div className="flex items-center justify-center gap-2">
            <Sparkles size={12} className="text-blue-500 animate-pulse" />
            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Rewards Platform</p>
@@ -293,7 +293,7 @@ const Login: React.FC = () => {
               onClick={() => setIsRegistering(!isRegistering)}
               className="w-full text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-500 transition-colors"
             >
-              {isRegistering ? 'Already have an account? Sign In' : 'New to STK? Create Account'}
+              {isRegistering ? 'Already have an account? Sign In' : 'New to STK PLAY? Create Account'}
             </button>
           </form>
         )}
@@ -339,7 +339,7 @@ const GuideModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <h4 className="text-xs font-black uppercase tracking-widest">Google Login</h4>
             </div>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold leading-relaxed">
-              The fastest way to start. We use your Google profile to securely create your STK account. No password needed.
+              The fastest way to start. We use your Google profile to securely create your STK PLAY account. No password needed.
             </p>
           </div>
 

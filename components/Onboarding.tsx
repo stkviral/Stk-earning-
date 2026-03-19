@@ -32,7 +32,7 @@ const Onboarding: React.FC = () => {
 
   const steps = [
     {
-      title: "Welcome to STK Earning!",
+      title: "Welcome to STK PLAY!",
       description: "Start earning real rewards by completing simple daily tasks.",
       icon: <Sparkles size={48} className="text-yellow-400" />,
       content: null
