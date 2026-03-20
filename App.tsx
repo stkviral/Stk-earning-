@@ -178,7 +178,7 @@ const mapSupabaseUserToUser = (dbUser: any): User => {
     id: dbUser.id,
     name: dbUser.name || dbUser.email?.split('@')[0] || 'User',
     email: dbUser.email,
-    role: dbUser.role || 'user',
+    role: dbUser.role === 'admin' ? 'admin' : 'user',
     avatar: dbUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dbUser.email}`,
     coins: dbUser.coins || 0,
     tag: dbUser.tag || UserTag.NORMAL,
