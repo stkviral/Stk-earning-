@@ -1130,7 +1130,7 @@ const App: React.FC = () => {
         if (selectError && selectError.code !== 'PGRST116') {
           console.error("Error checking if user exists:", selectError);
           // Still try to login with what we have if there's a network error, but don't overwrite
-          loginRef.current(email, name, undefined, null);
+          loginRef.current(email, name, undefined, undefined);
           return;
         }
 
@@ -1146,7 +1146,7 @@ const App: React.FC = () => {
             email: user.email,
             coins: 0,
             role: 'user',
-            created_at: new Date(),
+            created_at: new Date().toISOString(),
             referredBy: pendingReferralCode
           };
 
@@ -1160,13 +1160,19 @@ const App: React.FC = () => {
         } else {
           // 5. Handle case where user already exists (no duplicate insert)
           // Fetch full user data to update local state
-          const { data: fullUser } = await supabase
+          const { data: fullUser, error: fullUserError } = await supabase
             .from('users')
             .select('*')
             .eq('id', user.id)
             .single();
             
-          loginRef.current(email, name, undefined, fullUser);
+          if (fullUserError) {
+            console.error("Error fetching full user data:", fullUserError);
+            // Don't pass null if we know they exist, pass undefined to let login use local state if available
+            loginRef.current(email, name, undefined, undefined);
+          } else {
+            loginRef.current(email, name, undefined, fullUser);
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
