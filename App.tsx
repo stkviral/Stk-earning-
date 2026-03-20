@@ -1112,61 +1112,61 @@ const App: React.FC = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        const { user } = session;
+        // 1. After successful login, get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) return;
+
         const email = user.email || '';
         const name = user.user_metadata?.full_name || email.split('@')[0];
         
-        // Check if user exists in Supabase
-        const { data: existingUser, error } = await supabase
+        // 2. Check if user exists in "public.users"
+        const { data: existingUser, error: selectError } = await supabase
           .from('users')
-          .select('*')
+          .select('id')
           .eq('id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') {
-          console.error("Error fetching user from Supabase:", error);
+        if (selectError && selectError.code !== 'PGRST116') {
+          console.error("Error checking if user exists:", selectError);
           // Still try to login with what we have if there's a network error, but don't overwrite
           loginRef.current(email, name, undefined, null);
           return;
         }
 
-        const deviceId = getPersistentDeviceId();
-        const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
-        if (pendingReferralCode) {
-          localStorage.removeItem('pending_referral_code');
-        }
-
+        // 3. If user does NOT exist -> insert new record
         if (!existingUser) {
-          // Create new user in Supabase
-          const fingerprint = await generateDeviceFingerprint();
-          const ipAddress = await getIpAddress();
-          const emulatorDetected = isEmulator();
-          
+          const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
+          if (pendingReferralCode) {
+            localStorage.removeItem('pending_referral_code');
+          }
+
           const newUser = {
             id: user.id,
-            email: email,
-            role: 'user',
+            email: user.email,
             coins: 0,
-            referredBy: pendingReferralCode,
-            created_at: new Date().toISOString(),
-            device_fingerprint: fingerprint,
-            ip_address: ipAddress,
-            is_suspicious: emulatorDetected,
-            fraud_score: 0,
-            last_reward_time: 0,
-            is_banned: false
+            role: 'user',
+            created_at: new Date(),
+            referredBy: pendingReferralCode
           };
-          const { error: insertError } = await supabase.from('users').insert([newUser]);
+
+          const { error: insertError } = await supabase.from('users').insert(newUser);
+          
           if (insertError) {
             console.error("Error inserting new user:", insertError);
-          } else {
-            supabase.from('ip_logs').insert([{ user_id: user.id, ip_address: ipAddress }]).then(({ error }) => {
-              if (error) console.error("Failed to insert IP log for new user", error);
-            });
           }
+          
           loginRef.current(email, name, pendingReferralCode, newUser);
         } else {
-          loginRef.current(email, name, undefined, existingUser);
+          // 5. Handle case where user already exists (no duplicate insert)
+          // Fetch full user data to update local state
+          const { data: fullUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+            
+          loginRef.current(email, name, undefined, fullUser);
         }
       } else if (event === 'SIGNED_OUT') {
         setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 

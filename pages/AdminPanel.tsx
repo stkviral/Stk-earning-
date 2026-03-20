@@ -11,6 +11,8 @@ import {
 import { User, UserTag, UserStatus, COIN_TO_INR_RATE, AppSettings } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+import { useNavigate } from 'react-router-dom';
+
 type AdminTab = 'dashboard' | 'users' | 'payouts' | 'features' | 'system' | 'activity' | 'logs' | 'security';
 
 const StatCard = ({ label, value, sub, icon: Icon, color }: any) => (
@@ -467,6 +469,7 @@ const PayoutsTab: React.FC<{ setViewingUserId: (id: string) => void }> = ({ setV
 
 const AdminPanel: React.FC = () => {
   const { state, updateSettings, updateLogo, calculateRiskScore, adminActions } = useApp();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
@@ -544,7 +547,7 @@ const AdminPanel: React.FC = () => {
                            <p className="text-xs text-gray-400 mt-1">Manage users, roles, and devices directly in Supabase.</p>
                         </div>
                         <button 
-                           onClick={() => window.location.href = '/admin'}
+                           onClick={() => navigate('/admin')}
                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors"
                         >
                            Open

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { 
   Users, ShieldAlert, ShieldCheck, Coins, 
@@ -17,6 +18,7 @@ interface UserData {
 }
 
 export default function SupabaseAdminPanel() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
@@ -39,7 +41,7 @@ export default function SupabaseAdminPanel() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
-        window.location.href = '/';
+        navigate('/');
         return;
       }
 
@@ -50,7 +52,7 @@ export default function SupabaseAdminPanel() {
         .single();
 
       if (dbError || dbUser?.role !== 'admin') {
-        window.location.href = '/';
+        navigate('/');
         return;
       }
 
@@ -58,7 +60,7 @@ export default function SupabaseAdminPanel() {
       fetchUsers();
     } catch (error) {
       console.error('Error checking admin access:', error);
-      window.location.href = '/';
+      navigate('/');
     }
   };
 
@@ -233,7 +235,7 @@ export default function SupabaseAdminPanel() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl">
           <div className="flex items-center gap-4">
-            <button onClick={() => window.location.href = '/'} className="p-2 bg-gray-800 rounded-xl hover:bg-gray-700 transition-colors">
+            <button onClick={() => navigate('/')} className="p-2 bg-gray-800 rounded-xl hover:bg-gray-700 transition-colors">
               <ArrowLeft size={20} />
             </button>
             <div>

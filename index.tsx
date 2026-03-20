@@ -1,6 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import SupabaseAdminPanel from './pages/SupabaseAdminPanel';
 
@@ -11,10 +12,14 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 
-const isRouteAdmin = window.location.pathname === '/admin';
-
 root.render(
   <React.StrictMode>
-    {isRouteAdmin ? <SupabaseAdminPanel /> : <App />}
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/admin" element={<SupabaseAdminPanel />} />
+        <Route path="*" element={<App />} />
+      </Routes>
+    </BrowserRouter>
   </React.StrictMode>
 );
