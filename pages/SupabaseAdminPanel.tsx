@@ -69,7 +69,7 @@ export default function SupabaseAdminPanel() {
       setLoading(true);
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, coins, role, is_banned, created_at, deviceId')
+        .select('id, email, coins, role, is_banned, created_at, "deviceId"')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

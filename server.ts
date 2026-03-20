@@ -64,7 +64,7 @@ async function startServer() {
   try {
     const { data: users, error } = await supabase
       .from("users")
-      .select("id, name, avatar, coins, dailyEarned")
+      .select('id, name, avatar, coins, "dailyEarned"')
       .order("coins", { ascending: false })
       .limit(50);
       

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   User, UserTag, UserStatus, AppState, Transaction,
   COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL, SuspiciousActivityLog
@@ -37,7 +38,7 @@ interface AppContextType {
   claimAdReward: () => Promise<number | null>;
   claimDailyCheckIn: () => Promise<boolean>;
   playAd: (onReward: () => void, type: 'REWARD' | 'REQUIRED', onClose?: () => void, onError?: () => void) => void;
-  login: (email: string, name: string, referralCode?: string) => void;
+  login: (email: string, name: string, referralCode?: string) => Promise<boolean>;
   logout: () => void;
   toggleTheme: () => void;
   withdraw: (upiId: string, amount: number) => Promise<string | null>;
@@ -178,7 +179,7 @@ const mapSupabaseUserToUser = (dbUser: any): User => {
     id: dbUser.id,
     name: dbUser.name || dbUser.email?.split('@')[0] || 'User',
     email: dbUser.email,
-    role: dbUser.role === 'admin' ? 'admin' : 'user',
+    role: dbUser.role,
     avatar: dbUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dbUser.email}`,
     coins: dbUser.coins || 0,
     tag: dbUser.tag || UserTag.NORMAL,
@@ -215,6 +216,7 @@ const mapSupabaseUserToUser = (dbUser: any): User => {
 };
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
   const [state, setState] = useState<AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' }>(() => {
     const saved = localStorage.getItem('stk_app_state');
     const parsed = saved ? JSON.parse(saved) : null;
@@ -237,6 +239,7 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState('home');
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onReward: () => void; onClose: () => void; onError?: () => void } | null>(null);
   const lastRewardTimeRef = React.useRef<number>(0);
   const timeOffsetRef = React.useRef<number>(0);
@@ -969,7 +972,7 @@ const App: React.FC = () => {
         id: supabaseUser?.id || Math.random().toString(36).substring(2, 9),
         name,
         email,
-        role: supabaseUser?.role || 'user',
+        role: supabaseUser?.role,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
         coins: supabaseUser?.coins || 0,
         tag: UserTag.NORMAL,
@@ -1084,10 +1087,12 @@ const App: React.FC = () => {
       }
     }
     setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
-    setActiveTab(isAdmin ? 'admin' : 'home');
+    
     if (!isAdmin) {
       logActivity(user!.id, user!.name, 'LOGIN', `User logged in from ${user!.lastIp}`);
     }
+    
+    return isAdmin;
   };
 
   const logout = () => { 
@@ -1130,7 +1135,12 @@ const App: React.FC = () => {
         if (selectError && selectError.code !== 'PGRST116') {
           console.error("Error checking if user exists:", selectError);
           // Still try to login with what we have if there's a network error, but don't overwrite
-          loginRef.current(email, name, undefined, undefined);
+          const isAdmin = await loginRef.current(email, name, undefined, undefined);
+          if (isAdmin) {
+            navigate('/admin');
+          } else {
+            navigate('/dashboard');
+          }
           return;
         }
 
@@ -1145,7 +1155,6 @@ const App: React.FC = () => {
             id: user.id,
             email: user.email,
             coins: 0,
-            role: 'user',
             created_at: new Date().toISOString(),
             referredBy: pendingReferralCode
           };
@@ -1155,23 +1164,30 @@ const App: React.FC = () => {
           if (insertError) {
             console.error("Error inserting new user:", insertError);
           }
-          
-          loginRef.current(email, name, pendingReferralCode, newUser);
-        } else {
-          // 5. Handle case where user already exists (no duplicate insert)
-          // Fetch full user data to update local state
-          const { data: fullUser, error: fullUserError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-            
-          if (fullUserError) {
-            console.error("Error fetching full user data:", fullUserError);
-            // Don't pass null if we know they exist, pass undefined to let login use local state if available
-            loginRef.current(email, name, undefined, undefined);
+        }
+
+        // 4. Fetch user data from "public.users"
+        const { data: userData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        let isAdmin = false;
+        if (userData) {
+          setUserRole(userData.role);
+          isAdmin = await loginRef.current(email, name, undefined, userData);
+          if (userData.role === 'admin') {
+            navigate('/admin');
           } else {
-            loginRef.current(email, name, undefined, fullUser);
+            navigate('/dashboard');
+          }
+        } else {
+          isAdmin = await loginRef.current(email, name, undefined, undefined);
+          if (isAdmin) {
+            navigate('/admin');
+          } else {
+            navigate('/dashboard');
           }
         }
       } else if (event === 'SIGNED_OUT') {
