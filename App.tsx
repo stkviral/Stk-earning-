@@ -179,7 +179,7 @@ const mapSupabaseUserToUser = (dbUser: any): User => {
     id: dbUser.id,
     name: dbUser.name || dbUser.email?.split('@')[0] || 'User',
     email: dbUser.email,
-    role: dbUser.role,
+    role: dbUser.role === 'admin' ? 'admin' : 'user',
     avatar: dbUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dbUser.email}`,
     coins: dbUser.coins || 0,
     tag: dbUser.tag || UserTag.NORMAL,
@@ -856,7 +856,27 @@ const App: React.FC = () => {
       user = mapSupabaseUserToUser(supabaseUser);
     }
 
-    const isAdmin = supabaseUser?.role === 'admin' || user?.role === 'admin' || email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    let dbRole = supabaseUser?.role || user?.role;
+
+    try {
+      const { data: freshUser } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', supabaseUser?.id || user?.id)
+        .single();
+
+      if (freshUser?.role) {
+        dbRole = freshUser.role;
+      }
+    } catch (e) {
+      console.warn("Role fetch failed");
+    }
+
+    const isAdmin = dbRole === 'admin';
+
+    if (user) {
+      user.role = dbRole || 'user';
+    }
     const persistentId = getPersistentDeviceId();
     const fingerprint = await generateDeviceFingerprint();
     const ipAddress = await getIpAddress();
@@ -1086,8 +1106,10 @@ const App: React.FC = () => {
         });
       }
     }
-    setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
+    setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: user?.role === 'admin' }));
     
+    console.log("FINAL ROLE:", user?.role);
+
     if (!isAdmin) {
       logActivity(user!.id, user!.name, 'LOGIN', `User logged in from ${user!.lastIp}`);
     }
@@ -1177,7 +1199,7 @@ const App: React.FC = () => {
         if (userData) {
           setUserRole(userData.role);
           isAdmin = await loginRef.current(email, name, undefined, userData);
-          if (userData.role === 'admin') {
+          if (isAdmin) {
             navigate('/admin');
           } else {
             navigate('/dashboard');
@@ -1207,7 +1229,7 @@ const App: React.FC = () => {
   }, []);
 
   const calculateRiskScore = useCallback((user: User) => {
-    if (user.fraudDetectionExempt || user.role === 'admin' || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || state.adminUsers.some(a => a.email.toLowerCase() === user.email.toLowerCase())) return 0;
+    if (user.fraudDetectionExempt || user.role === 'admin' || state.adminUsers.some(a => a.email.toLowerCase() === user.email.toLowerCase())) return 0;
     let score = 0;
     
     // Check for shared Device ID
@@ -1785,7 +1807,7 @@ const App: React.FC = () => {
       );
     }
     if (activeTab === 'admin') {
-      if (state.currentUser?.role !== 'admin' && state.currentUser?.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      if (state.currentUser?.role !== 'admin') {
         setActiveTab('home');
         return <Dashboard />;
       }

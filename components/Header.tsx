@@ -48,7 +48,7 @@ const Header: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
 
   useEffect(() => {
     if (logoTaps >= 5) {
-      if (isAdmin || currentUser?.role === 'admin' || currentUser?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      if (currentUser?.role === 'admin') {
         setActiveTab('admin');
         setLogoTaps(0);
       }
