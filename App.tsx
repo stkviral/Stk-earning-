@@ -1131,114 +1131,49 @@ const App: React.FC = () => {
     setActiveTab('home'); 
   };
 
-  const loginRef = React.useRef(login);
   useEffect(() => {
-    loginRef.current = login;
-  }, [login]);
+    if (window.location.hash.includes('access_token')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
-    const restoreSession = async () => {
-      const { data } = await supabase.auth.getSession();
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("Auth Event:", event);
 
-      if (data?.session?.user) {
-        if (!state.isLoggedIn) {
-          const user = data.session.user;
+        if (event === 'SIGNED_IN' && session?.user) {
+          const user = session.user;
 
-          const email = user.email || '';
-          const name = user.user_metadata?.full_name || email.split('@')[0];
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-          loginRef.current(email, name, undefined, user);
+          if (dbUser) {
+            setState(prev => ({
+              ...prev,
+              currentUser: mapSupabaseUserToUser(dbUser),
+              isLoggedIn: true,
+              isAdminSession: dbUser.role === 'admin'
+            }));
+          }
+        }
+
+        if (event === 'SIGNED_OUT') {
+          setState(prev => ({
+            ...prev,
+            currentUser: null,
+            isLoggedIn: false,
+            isAdminSession: false
+          }));
         }
       }
-    };
-
-    restoreSession();
-  }, [state.isLoggedIn]);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        // 1. After successful login, get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) return;
-
-        const email = user.email || '';
-        const name = user.user_metadata?.full_name || email.split('@')[0];
-        
-        // 2. Check if user exists in "public.users"
-        const { data: existingUser, error: selectError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .single();
-
-        if (selectError && selectError.code !== 'PGRST116') {
-          console.error("Error checking if user exists:", selectError);
-          // Still try to login with what we have if there's a network error, but don't overwrite
-          const isAdmin = await loginRef.current(email, name, undefined, undefined);
-          if (isAdmin) {
-            navigate('/admin');
-          } else {
-            navigate('/');
-          }
-          return;
-        }
-
-        // 3. If user does NOT exist -> insert new record
-        if (!existingUser) {
-          const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
-          if (pendingReferralCode) {
-            localStorage.removeItem('pending_referral_code');
-          }
-
-          const newUser = {
-            id: user.id,
-            email: user.email,
-            coins: 0,
-            created_at: new Date().toISOString(),
-            referredBy: pendingReferralCode
-          };
-
-          const { error: insertError } = await supabase.from('users').insert(newUser);
-          
-          if (insertError) {
-            console.error("Error inserting new user:", insertError);
-          }
-        }
-
-        // 4. Fetch user data from "public.users"
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        let isAdmin = false;
-        if (userData) {
-          setUserRole(userData.role);
-          isAdmin = await loginRef.current(email, name, undefined, userData);
-          if (isAdmin) {
-            navigate('/admin');
-          } else {
-            navigate('/');
-          }
-        } else {
-          isAdmin = await loginRef.current(email, name, undefined, undefined);
-          if (isAdmin) {
-            navigate('/admin');
-          } else {
-            navigate('/');
-          }
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setState(prev => ({ ...prev, currentUser: null, isLoggedIn: false, isAdminSession: false })); 
-        setActiveTab('home');
-      }
-    });
+    );
 
     return () => {
-      subscription.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
   const toggleTheme = useCallback(() => {
