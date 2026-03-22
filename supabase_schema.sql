@@ -93,18 +93,22 @@ ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ip_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reward_logs ENABLE ROW LEVEL SECURITY;
 
+-- Create function to check if user is admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Create policies for users table
 CREATE POLICY "Users can view their own profile" ON public.users FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON public.users FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-);
-CREATE POLICY "Admins can update all profiles" ON public.users FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-);
-CREATE POLICY "Admins can insert profiles" ON public.users FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-);
+CREATE POLICY "Admins can view all profiles" ON public.users FOR SELECT USING (public.is_admin());
+CREATE POLICY "Admins can update all profiles" ON public.users FOR UPDATE USING (public.is_admin());
+CREATE POLICY "Admins can insert profiles" ON public.users FOR INSERT WITH CHECK (public.is_admin());
 -- Allow inserting own profile during signup
 CREATE POLICY "Users can insert their own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
 

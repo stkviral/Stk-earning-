@@ -1106,7 +1106,7 @@ const App: React.FC = () => {
         });
       }
     }
-    setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: user?.role === 'admin' }));
+    setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
     
     console.log("FINAL ROLE:", user?.role);
 
@@ -1137,6 +1137,25 @@ const App: React.FC = () => {
   }, [login]);
 
   useEffect(() => {
+    const restoreSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (data?.session?.user) {
+        if (!state.isLoggedIn) {
+          const user = data.session.user;
+
+          const email = user.email || '';
+          const name = user.user_metadata?.full_name || email.split('@')[0];
+
+          loginRef.current(email, name, undefined, user);
+        }
+      }
+    };
+
+    restoreSession();
+  }, [state.isLoggedIn]);
+
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
         // 1. After successful login, get current user
@@ -1161,7 +1180,7 @@ const App: React.FC = () => {
           if (isAdmin) {
             navigate('/admin');
           } else {
-            navigate('/dashboard');
+            navigate('/');
           }
           return;
         }
@@ -1202,14 +1221,14 @@ const App: React.FC = () => {
           if (isAdmin) {
             navigate('/admin');
           } else {
-            navigate('/dashboard');
+            navigate('/');
           }
         } else {
           isAdmin = await loginRef.current(email, name, undefined, undefined);
           if (isAdmin) {
             navigate('/admin');
           } else {
-            navigate('/dashboard');
+            navigate('/');
           }
         }
       } else if (event === 'SIGNED_OUT') {
