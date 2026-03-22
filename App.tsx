@@ -1131,6 +1131,11 @@ const App: React.FC = () => {
     setActiveTab('home'); 
   };
 
+  const loginRef = React.useRef(login);
+  useEffect(() => {
+    loginRef.current = login;
+  }, [login]);
+
   useEffect(() => {
     if (window.location.hash.includes('access_token')) {
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -1142,22 +1147,46 @@ const App: React.FC = () => {
       async (event, session) => {
         console.log("Auth Event:", event);
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
           const user = session.user;
 
-          const { data: dbUser } = await supabase
+          let { data: dbUser } = await supabase
             .from('users')
             .select('*')
             .eq('id', user.id)
             .single();
 
+          if (!dbUser) {
+            const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
+            if (pendingReferralCode) {
+              localStorage.removeItem('pending_referral_code');
+            }
+
+            const newUser = {
+              id: user.id,
+              email: user.email,
+              coins: 0,
+              created_at: new Date().toISOString(),
+              referredBy: pendingReferralCode
+            };
+
+            const { error: insertError } = await supabase.from('users').insert(newUser);
+            if (!insertError) {
+               const { data: newDbUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+               dbUser = newDbUser;
+            } else {
+              console.error("Error inserting new user:", insertError);
+            }
+          }
+
           if (dbUser) {
-            setState(prev => ({
-              ...prev,
-              currentUser: mapSupabaseUserToUser(dbUser),
-              isLoggedIn: true,
-              isAdminSession: dbUser.role === 'admin'
-            }));
+            const email = user.email || '';
+            const name = user.user_metadata?.full_name || email.split('@')[0];
+            await loginRef.current(email, name, undefined, dbUser);
           }
         }
 
