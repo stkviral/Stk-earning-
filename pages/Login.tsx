@@ -46,15 +46,11 @@ const Login: React.FC = () => {
 
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        }
-      });
+  provider: 'google',
+  options: {
+    redirectTo: 'https://stk-earning.vercel.app/'
+  }
+});
 
       if (error) {
         console.error("Supabase Google Login Error:", error);
