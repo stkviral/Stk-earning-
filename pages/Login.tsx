@@ -13,7 +13,7 @@ const Login: React.FC = () => {
   const [name, setName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const { state } = useApp();
+  const { state, logout } = useApp();
 
   // Disable FedCM to avoid NotAllowedError in iframes
   React.useEffect(() => {
@@ -45,6 +45,11 @@ const Login: React.FC = () => {
     }
 
     try {
+      // Reset frontend state
+      logout();
+      // Clear old session before login
+      await supabase.auth.signOut();
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -70,6 +75,18 @@ const Login: React.FC = () => {
     if (!email || !password) return;
     if (isRegistering && !name) return;
     
+    // Client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters long.");
+      return;
+    }
+
     setIsLoggingIn(true);
 
     if (referralCode) {
@@ -265,6 +282,7 @@ const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 p-4 pl-12 rounded-2xl font-bold text-sm text-gray-900 dark:text-white focus:border-blue-600 outline-none transition-all uppercase"
                   required
+                  minLength={6}
                 />
               </div>
             </div>

@@ -244,6 +244,8 @@ const App: React.FC = () => {
   const lastRewardTimeRef = React.useRef<number>(0);
   const timeOffsetRef = React.useRef<number>(0);
 
+  console.log("ACTIVE USER:", state.currentUser?.email);
+
   useEffect(() => {
     const fetchServerTime = async () => {
       try {
@@ -863,7 +865,7 @@ const App: React.FC = () => {
   }, []);
 
   const login = async (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
-    let user = state.allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    let user = state.allUsers.find(u => u.id === supabaseUser?.id);
     
     if (!user && supabaseUser) {
       user = mapSupabaseUserToUser(supabaseUser);
@@ -1177,13 +1179,20 @@ const App: React.FC = () => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("AUTH EVENT:", event);
+        console.log("CURRENT USER:", session?.user?.email);
 
         if (session?.user) {
-          // Set basic session immediately to prevent redirect loop
           setState(prev => ({
             ...prev,
             currentUser: mapSupabaseUserToUser(session.user),
             isLoggedIn: true
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            currentUser: null,
+            isLoggedIn: false,
+            isAdminSession: false
           }));
         }
 
@@ -1228,15 +1237,6 @@ const App: React.FC = () => {
             const name = user.user_metadata?.full_name || email.split('@')[0];
             await loginRef.current(email, name, undefined, dbUser);
           }
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setState(prev => ({
-            ...prev,
-            currentUser: null,
-            isLoggedIn: false,
-            isAdminSession: false
-          }));
         }
       }
     );
