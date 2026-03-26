@@ -74,9 +74,13 @@ export default function SupabaseAdminPanel() {
 
       if (error) throw error;
       setUsers(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching users:', error);
-      alert('Failed to fetch users');
+      if (error.message === 'Failed to fetch' || (error instanceof TypeError && error.message === 'Failed to fetch')) {
+        alert('Network error: Failed to fetch users. Please check your Supabase URL (VITE_SUPABASE_URL) and ensure your Supabase project is active and accessible.');
+      } else {
+        alert('Failed to fetch users: ' + (error.message || 'Unknown error'));
+      }
     } finally {
       setLoading(false);
     }

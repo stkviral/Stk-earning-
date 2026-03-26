@@ -62,7 +62,11 @@ async function startServer() {
   });
 
   app.get("/api/test-env", (req, res) => {
-    res.json({ hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY });
+    res.json({ 
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      supabaseUrl: process.env.VITE_SUPABASE_URL,
+      supabaseKeyPrefix: process.env.VITE_SUPABASE_ANON_KEY?.substring(0, 10)
+    });
   });
 
   app.get("/api/test-rpc", async (req, res) => {

@@ -261,20 +261,30 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchAllUsers = async () => {
       try {
-        let endpoint = '/api/leaderboard';
+        let usersData: any[] = [];
+        
         if (state.isAdminSession && state.currentUser?.id) {
-          endpoint = `/api/admin/view-users?adminId=${state.currentUser.id}`;
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          usersData = data || [];
+        } else {
+          // For regular users, only fetch public leaderboard data
+          const { data, error } = await supabase
+            .from('users')
+            .select('id, email, coins, created_at')
+            .order('coins', { ascending: false })
+            .limit(50);
+            
+          if (error) throw error;
+          usersData = data || [];
         }
         
-        const response = await fetch(endpoint);
-        if (!response.ok) {
-          console.error("Failed to fetch users from API");
-          return;
-        }
-        const { users: data } = await response.json();
-        
-        if (data) {
-          const users = data.map(mapSupabaseUserToUser);
+        if (usersData.length > 0) {
+          const users = usersData.map(mapSupabaseUserToUser);
           setState(prev => {
             // Merge fetched users with existing allUsers to avoid overwriting recent local updates
             const newAllUsers = [...users];
@@ -298,8 +308,11 @@ const App: React.FC = () => {
             return { ...prev, allUsers: newAllUsers, currentUser: newCurrentUser };
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching users:", error);
+        if (error.message === 'Failed to fetch' || (error instanceof TypeError && error.message === 'Failed to fetch')) {
+          console.error("Network error: Failed to fetch users. If you are deployed on Vercel, ensure your backend API is accessible or rewrite the fetch to use Supabase directly.");
+        }
       }
     };
     fetchAllUsers();
@@ -1143,9 +1156,36 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      console.log("SESSION:", data);
+
+      if (data?.session?.user) {
+        // Set basic session immediately to prevent redirect loop
+        setState(prev => ({
+          ...prev,
+          currentUser: mapSupabaseUserToUser(data.session.user),
+          isLoggedIn: true
+        }));
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("Auth Event:", event);
+        console.log("AUTH EVENT:", event);
+
+        if (session?.user) {
+          // Set basic session immediately to prevent redirect loop
+          setState(prev => ({
+            ...prev,
+            currentUser: mapSupabaseUserToUser(session.user),
+            isLoggedIn: true
+          }));
+        }
 
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
           const user = session.user;
