@@ -1867,6 +1867,14 @@ const App: React.FC = () => {
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
       checkAdBlocker, logAdminAction, logActivity, logSuspiciousActivity, updateDeviceClaim, adminActions
     }}>
+      <style>{`
+        input:focus, textarea:focus, select:focus {
+          border-color: #7C3AED !important;
+          box-shadow: 0 0 15px rgba(124, 58, 237, 0.5) !important;
+          outline: none !important;
+          transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+        }
+      `}</style>
       <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-gray-50 dark:bg-gray-950 shadow-2xl relative overflow-hidden transition-colors duration-300">
         {state.isLoggedIn && <Header isAdmin={state.isAdminSession} />}
         {state.isAdminSession && activeTab !== 'admin' && (
