@@ -1153,8 +1153,31 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (window.location.hash.includes('access_token')) {
-      window.history.replaceState({}, document.title, window.location.pathname);
+      if (window.opener) {
+        // Wait for Supabase to process the hash and save to local storage
+        setTimeout(() => {
+          window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
+          window.close();
+        }, 1000);
+      } else {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin is from AI Studio preview or localhost
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   useEffect(() => {
@@ -1162,12 +1185,12 @@ const App: React.FC = () => {
       const { data } = await supabase.auth.getSession();
       console.log("SESSION:", data);
 
-      if (data?.session?.user) {
-        // Set basic session immediately to prevent redirect loop
+      if (!data?.session?.user) {
         setState(prev => ({
           ...prev,
-          currentUser: mapSupabaseUserToUser(data.session.user),
-          isLoggedIn: true
+          currentUser: null,
+          isLoggedIn: false,
+          isAdminSession: false
         }));
       }
     };
@@ -1181,13 +1204,7 @@ const App: React.FC = () => {
         console.log("AUTH EVENT:", event);
         console.log("CURRENT USER:", session?.user?.email);
 
-        if (session?.user) {
-          setState(prev => ({
-            ...prev,
-            currentUser: mapSupabaseUserToUser(session.user),
-            isLoggedIn: true
-          }));
-        } else {
+        if (!session?.user) {
           setState(prev => ({
             ...prev,
             currentUser: null,
