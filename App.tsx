@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Confetti from 'react-confetti';
+import { useWindowSize } from 'react-use';
 import { 
   User, UserTag, UserStatus, AppState, Transaction,
   COIN_TO_INR_RATE, AppSettings, AdminLog, ActivityLog, ADMIN_EMAIL, SuspiciousActivityLog
@@ -50,6 +52,7 @@ interface AppContextType {
   logActivity: (userId: string, userName: string, action: string, details: string) => void;
   logSuspiciousActivity: (userId: string, userName: string, reason: string, details: string) => void;
   updateDeviceClaim: (deviceId: string, timestamp: number) => void;
+  triggerConfetti: () => void;
   adminActions: {
     approveWithdrawal: (userId: string, txId: string, paymentTxId?: string) => Promise<void>;
     rejectWithdrawal: (userId: string, txId: string, rejectionReason: string) => Promise<void>;
@@ -217,6 +220,7 @@ const mapSupabaseUserToUser = (dbUser: any): User => {
 
 const App: React.FC = () => {
   const navigate = useNavigate();
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [state, setState] = useState<AppState & { isAdBlockerActive: boolean; isAdminSession: boolean; theme: 'light' | 'dark' }>(() => {
     const saved = localStorage.getItem('stk_app_state');
     const parsed = saved ? JSON.parse(saved) : null;
@@ -241,6 +245,14 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [adConfig, setAdConfig] = useState<{ type: 'REWARD' | 'REQUIRED'; onReward: () => void; onClose: () => void; onError?: () => void } | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const { width, height } = useWindowSize();
+
+  const triggerConfetti = useCallback(() => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 4000); // Stop after 4 seconds
+  }, []);
+
   const lastRewardTimeRef = React.useRef<number>(0);
   const timeOffsetRef = React.useRef<number>(0);
 
@@ -664,6 +676,7 @@ const App: React.FC = () => {
       });
       
       logActivity(state.currentUser.id, state.currentUser.name, 'SPIN_CLAIM', `Won ${reward} coins`);
+      triggerConfetti();
       return reward;
     } catch (error) {
       console.error("Error claiming spin reward:", error);
@@ -709,6 +722,7 @@ const App: React.FC = () => {
       });
       
       logActivity(state.currentUser.id, state.currentUser.name, 'SCRATCH_CLAIM', `Won ${reward} coins`);
+      triggerConfetti();
       return reward;
     } catch (error) {
       console.error("Error claiming scratch reward:", error);
@@ -754,6 +768,7 @@ const App: React.FC = () => {
       });
       
       logActivity(state.currentUser.id, state.currentUser.name, 'VIDEO_WATCH', `Watched video for ${reward} coins`);
+      triggerConfetti();
       return reward;
     } catch (error) {
       console.error("Error claiming ad reward:", error);
@@ -865,33 +880,11 @@ const App: React.FC = () => {
   }, []);
 
   const login = async (email: string, name: string, referralCode?: string, supabaseUser?: any) => {
-    let user = state.allUsers.find(u => u.id === supabaseUser?.id);
+    if (!supabaseUser) return false;
     
-    if (!user && supabaseUser) {
-      user = mapSupabaseUserToUser(supabaseUser);
-    }
+    let user = mapSupabaseUserToUser(supabaseUser);
+    const isAdmin = user.role === 'admin';
 
-    let dbRole = supabaseUser?.role || user?.role;
-
-    try {
-      const { data: freshUser } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', supabaseUser?.id || user?.id)
-        .single();
-
-      if (freshUser?.role) {
-        dbRole = freshUser.role;
-      }
-    } catch (e) {
-      console.warn("Role fetch failed");
-    }
-
-    const isAdmin = dbRole === 'admin';
-
-    if (user) {
-      user.role = dbRole || 'user';
-    }
     const persistentId = getPersistentDeviceId();
     const fingerprint = await generateDeviceFingerprint();
     const ipAddress = await getIpAddress();
@@ -900,28 +893,26 @@ const App: React.FC = () => {
     let isWhitelisted = false;
 
     // IP Address Monitoring
-    if (user) {
-      supabase.from('ip_logs').insert([{ user_id: user.id, ip_address: ipAddress }]).then(({ error }) => {
-        if (error) console.error("Failed to insert IP log", error);
-      });
-    }
+    supabase.from('ip_logs').insert([{ user_id: user.id, ip_address: ipAddress }]).then(({ error }) => {
+      if (error) console.error("Failed to insert IP log", error);
+    });
 
     const recentIpLogins = state.allUsers.filter(u => u.ip_address === ipAddress && u.createdAt && (Date.now() - u.createdAt < 24 * 60 * 60 * 1000)).length;
     if (recentIpLogins > 5 && !isAdmin) {
-       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'IP_SPAM', `More than 5 accounts created from IP ${ipAddress} within 24 hours`);
+       logSuspiciousActivity(user.id, name, 'IP_SPAM', `More than 5 accounts created from IP ${ipAddress} within 24 hours`);
     }
 
     // Emulator Detection
     const emulatorDetected = isEmulator();
     if (emulatorDetected && !isAdmin) {
-       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'EMULATOR_DETECTED', `Emulator usage detected`);
+       logSuspiciousActivity(user.id, name, 'EMULATOR_DETECTED', `Emulator usage detected`);
     }
 
     // Device Fingerprint System
     const fingerprintAccounts = state.allUsers.filter(u => u.device_fingerprint === fingerprint).length;
-    if (fingerprintAccounts >= 3 && !isAdmin && (!user || user.device_fingerprint !== fingerprint)) {
+    if (fingerprintAccounts >= 3 && !isAdmin && user.device_fingerprint !== fingerprint) {
        isDeviceBlocked = true;
-       logSuspiciousActivity(user?.id || 'UNKNOWN', name, 'FINGERPRINT_SPAM', `More than 3 accounts using fingerprint ${fingerprint}`);
+       logSuspiciousActivity(user.id, name, 'FINGERPRINT_SPAM', `More than 3 accounts using fingerprint ${fingerprint}`);
     }
 
     if (!isAdmin && state.settings.deviceLimitEnabled) {
@@ -938,17 +929,9 @@ const App: React.FC = () => {
         } else if (device) {
            isWhitelisted = device.is_whitelisted;
            let currentCount = device.account_count || 0;
-           const limit = user?.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+           const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
            
-           // If user is new to this device, check limit BEFORE incrementing if it's a completely new user
-           if (!user) {
-             if (!isWhitelisted && currentCount >= limit) {
-               isDeviceBlocked = true;
-             } else {
-               currentCount += 1;
-               await supabase.from('devices').update({ account_count: currentCount }).eq('device_id', persistentId);
-             }
-           } else if (user.deviceId !== persistentId) {
+           if (user.deviceId !== persistentId) {
              // Decrement count on old device if it exists
              if (user.deviceId && !user.deviceLimitBlocked) {
                try {
@@ -990,143 +973,80 @@ const App: React.FC = () => {
         console.error("Device check failed:", err);
         // Fallback to local logic
         const accountsOnDevice = state.allUsers.filter(u => u.deviceId === persistentId).length;
-        const limit = user?.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
+        const limit = user.customDeviceLimit ?? state.settings.maxAccountsPerDevice ?? 3;
         if (!state.settings.exemptDevices?.includes(persistentId) && accountsOnDevice >= limit) {
            isDeviceBlocked = true;
         }
       }
     }
 
-    if (!user) {
-      // Check device limit for NEW accounts
-      if (isDeviceBlocked) {
-        console.warn(`Device limit reached. Account will be created but reward actions will be blocked.`);
-      }
+    user.deviceId = persistentId;
+    user.deviceLimitBlocked = isDeviceBlocked;
+    user.lastIp = ipAddress;
+    user.device_fingerprint = fingerprint;
 
-      user = {
-        id: supabaseUser?.id || Math.random().toString(36).substring(2, 9),
-        name,
-        email,
-        role: supabaseUser?.role,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-        coins: supabaseUser?.coins || 0,
-        tag: UserTag.NORMAL,
-        referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        referredBy: referralCode,
-        dailyEarned: 0,
-        lastResetTimestamp: Date.now(),
-        createdAt: supabaseUser?.created_at ? new Date(supabaseUser.created_at).getTime() : Date.now(),
-        adsWatchedToday: 0,
-        lastAdTimestamp: 0,
-        dailyRewardClaimed: false,
-        streakDays: 0,
-        spinsToday: 0,
-        lastSpinTimestamp: 0,
-        extraSpinWatchedToday: false,
-        scratchesToday: 0,
-        lastScratchTimestamp: 0,
-        extraScratchWatchedToday: false,
-        status: UserStatus.ACTIVE,
-        walletFrozen: false,
-        adsBlocked: false,
-        transactions: [],
-        referralHistory: [],
-        deviceId: persistentId,
-        deviceLimitBlocked: isDeviceBlocked,
-        lastIp: ipAddress,
-        riskScore: 0,
-        earningVelocity: 0,
-        lastActiveAt: Date.now(),
-        device_fingerprint: fingerprint,
-        ip_address: ipAddress,
-        is_suspicious: isDeviceBlocked || recentIpLogins > 5 || emulatorDetected,
-        fraud_score: 0,
-        last_reward_time: 0,
-        is_banned: false
-      };
-      setState(prev => {
-        let updatedAllUsers = [...prev.allUsers, user!];
-        
-        // Handle referral reward
-        if (referralCode) {
-          const referrerIndex = updatedAllUsers.findIndex(u => u.referralCode === referralCode);
-          if (referrerIndex !== -1) {
-            const referrer = updatedAllUsers[referrerIndex];
-            const reward = prev.settings.referralReward || 50;
-            const updatedReferrer = {
-              ...referrer,
-              coins: referrer.coins + reward,
-              referralHistory: [
-                ...(referrer.referralHistory || []),
-                {
-                  referredUserId: user!.id,
-                  referredUserName: user!.name,
-                  timestamp: Date.now(),
-                  reward: reward
-                }
-              ]
-            };
-            updatedAllUsers[referrerIndex] = updatedReferrer;
-            
-            // Sync referrer to Supabase
-            supabase.from('users').update({ 
-              coins: updatedReferrer.coins,
-              referralHistory: updatedReferrer.referralHistory
-            }).eq('id', referrer.id).then(({ error }) => {
-              if (error) console.error("Failed to update referrer in Supabase", error);
-            });
-          }
-        }
-        
-        return { ...prev, allUsers: updatedAllUsers };
-      });
-    } else {
-      // Update existing user's data from Supabase
-      if (supabaseUser) {
-        user = mapSupabaseUserToUser(supabaseUser);
-        setState(prev => {
-          const exists = prev.allUsers.some(u => u.id === user!.id);
-          return {
-            ...prev,
-            allUsers: exists 
-              ? prev.allUsers.map(u => u.id === user!.id ? user! : u)
-              : [...prev.allUsers, user!]
-          };
-        });
-      }
-
-      // Update existing user's device ID to the persistent one if it's different
-      if (user.deviceId !== persistentId) {
-        if (isDeviceBlocked) {
-          console.warn(`Device limit reached. You can log into this account on this device, but reward actions will be blocked.`);
-        }
-        user.deviceId = persistentId;
-        setState(prev => ({
-          ...prev,
-          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceId: persistentId } : u)
-        }));
-        supabase.from('users').update({ deviceId: persistentId }).eq('id', user.id).then(({ error }) => {
-          if (error) console.error("Failed to sync deviceId to Supabase", error);
-        });
+    setState(prev => {
+      let updatedAllUsers = [...prev.allUsers];
+      const exists = updatedAllUsers.some(u => u.id === user.id);
+      
+      if (exists) {
+        updatedAllUsers = updatedAllUsers.map(u => u.id === user.id ? user : u);
+      } else {
+        updatedAllUsers.push(user);
       }
       
-      if (user.deviceLimitBlocked !== isDeviceBlocked) {
-        user.deviceLimitBlocked = isDeviceBlocked;
-        setState(prev => ({
-          ...prev,
-          allUsers: prev.allUsers.map(u => u.id === user!.id ? { ...u, deviceLimitBlocked: isDeviceBlocked } : u)
-        }));
-        supabase.from('users').update({ deviceLimitBlocked: isDeviceBlocked }).eq('id', user.id).then(({ error }) => {
-          if (error) console.error("Failed to sync deviceLimitBlocked to Supabase", error);
-        });
+      // Handle referral reward
+      if (referralCode) {
+        const referrerIndex = updatedAllUsers.findIndex(u => u.referralCode === referralCode);
+        if (referrerIndex !== -1) {
+          const referrer = updatedAllUsers[referrerIndex];
+          const reward = prev.settings.referralReward || 50;
+          const updatedReferrer = {
+            ...referrer,
+            coins: referrer.coins + reward,
+            referralHistory: [
+              ...(referrer.referralHistory || []),
+              {
+                referredUserId: user.id,
+                referredUserName: user.name,
+                timestamp: Date.now(),
+                reward: reward
+              }
+            ]
+          };
+          updatedAllUsers[referrerIndex] = updatedReferrer;
+          
+          // Sync referrer to Supabase
+          supabase.from('users').update({ 
+            coins: updatedReferrer.coins,
+            referralHistory: updatedReferrer.referralHistory
+          }).eq('id', referrer.id).then(({ error }) => {
+            if (error) console.error("Failed to update referrer in Supabase", error);
+          });
+        }
       }
-    }
-    setState(prev => ({ ...prev, currentUser: user!, isLoggedIn: true, isAdminSession: isAdmin }));
-    
-    console.log("FINAL ROLE:", user?.role);
+      
+      return { 
+        ...prev, 
+        currentUser: user, 
+        isLoggedIn: true, 
+        isAdminSession: isAdmin,
+        allUsers: updatedAllUsers 
+      };
+    });
+
+    // Sync to Supabase
+    supabase.from('users').update({ 
+      deviceId: persistentId, 
+      deviceLimitBlocked: isDeviceBlocked,
+      lastIp: ipAddress,
+      device_fingerprint: fingerprint
+    }).eq('id', user.id).then(({ error }) => {
+      if (error) console.error("Failed to sync device info to Supabase", error);
+    });
 
     if (!isAdmin) {
-      logActivity(user!.id, user!.name, 'LOGIN', `User logged in from ${user!.lastIp}`);
+      logActivity(user.id, user.name, 'LOGIN', `User logged in from ${ipAddress}`);
     }
     
     return isAdmin;
@@ -1181,79 +1101,78 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      console.log("SESSION:", data);
-
-      if (!data?.session?.user) {
+    const handleAuth = async (session: any) => {
+      if (!session?.user) {
         setState(prev => ({
           ...prev,
           currentUser: null,
           isLoggedIn: false,
           isAdminSession: false
         }));
+        setIsAuthReady(true);
+        return;
       }
+
+      const user = session.user;
+      let { data: dbUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      let isNewUser = false;
+      let pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
+
+      if (!dbUser) {
+        isNewUser = true;
+        if (pendingReferralCode) {
+          localStorage.removeItem('pending_referral_code');
+        }
+
+        const newUser = {
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          coins: 0,
+          created_at: new Date().toISOString(),
+          referredBy: pendingReferralCode
+        };
+
+        const { error: insertError } = await supabase.from('users').insert(newUser);
+        if (!insertError) {
+           const { data: newDbUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+           dbUser = newDbUser;
+        } else {
+          console.error("Error inserting new user:", insertError);
+        }
+      }
+
+      if (dbUser) {
+        const email = user.email || '';
+        const name = user.user_metadata?.full_name || email.split('@')[0];
+        await loginRef.current(email, name, isNewUser ? pendingReferralCode : undefined, dbUser);
+      }
+      setIsAuthReady(true);
     };
 
-    checkSession();
-  }, []);
-
-  useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("AUTH EVENT:", event);
         console.log("CURRENT USER:", session?.user?.email);
-
-        if (!session?.user) {
+        
+        if (event === 'SIGNED_OUT') {
           setState(prev => ({
             ...prev,
             currentUser: null,
             isLoggedIn: false,
             isAdminSession: false
           }));
-        }
-
-        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-          const user = session.user;
-
-          let { data: dbUser } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          if (!dbUser) {
-            const pendingReferralCode = localStorage.getItem('pending_referral_code') || undefined;
-            if (pendingReferralCode) {
-              localStorage.removeItem('pending_referral_code');
-            }
-
-            const newUser = {
-              id: user.id,
-              email: user.email,
-              coins: 0,
-              created_at: new Date().toISOString(),
-              referredBy: pendingReferralCode
-            };
-
-            const { error: insertError } = await supabase.from('users').insert(newUser);
-            if (!insertError) {
-               const { data: newDbUser } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-               dbUser = newDbUser;
-            } else {
-              console.error("Error inserting new user:", insertError);
-            }
-          }
-
-          if (dbUser) {
-            const email = user.email || '';
-            const name = user.user_metadata?.full_name || email.split('@')[0];
-            await loginRef.current(email, name, undefined, dbUser);
-          }
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+          await handleAuth(session);
         }
       }
     );
@@ -1824,6 +1743,14 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (!isAuthReady) {
+      return (
+        <div className="flex flex-col h-full items-center justify-center p-8 text-center space-y-6 bg-white dark:bg-gray-950">
+          <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest animate-pulse">Authenticating...</p>
+        </div>
+      );
+    }
     if (!state.isLoggedIn) {
       return <Login />;
     }
@@ -1882,7 +1809,7 @@ const App: React.FC = () => {
       claimSpinReward, claimScratchReward, claimAdReward, claimDailyCheckIn,
       playAd, login, logout, 
       toggleTheme, withdraw, cancelWithdrawal, setActiveTab, calculateRiskScore,
-      checkAdBlocker, logAdminAction, logActivity, logSuspiciousActivity, updateDeviceClaim, adminActions
+      checkAdBlocker, logAdminAction, logActivity, logSuspiciousActivity, updateDeviceClaim, triggerConfetti, adminActions
     }}>
       <style>{`
         input:focus, textarea:focus, select:focus {
@@ -1916,6 +1843,24 @@ const App: React.FC = () => {
         )}
         {adConfig && <AdOverlay type={adConfig.type} onReward={adConfig.onReward} onClose={adConfig.onClose} onError={adConfig.onError} />}
         <Onboarding />
+        {showConfetti && (
+          <div className="fixed inset-0 z-[9999] pointer-events-none">
+            <Confetti
+              width={width}
+              height={height}
+              recycle={false}
+              numberOfPieces={200}
+              gravity={0.2}
+              colors={['#FFD700', '#FFA500', '#FF8C00', '#FFD700', '#FFFFFF']}
+              drawShape={ctx => {
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+              }}
+            />
+          </div>
+        )}
       </div>
     </AppContext.Provider>
   );
