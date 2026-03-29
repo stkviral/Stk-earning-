@@ -1087,9 +1087,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Validate origin is from AI Studio preview or localhost
+      // Validate origin is from AI Studio preview, localhost, or Vercel
       const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.endsWith('.vercel.app')) {
         return;
       }
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
@@ -1741,6 +1741,8 @@ const App: React.FC = () => {
       logAdminAction('DEVICE_UNBIND_ALL', 'SYSTEM', 'Unbound all devices and reset limits globally');
     }
   };
+
+  console.log("CURRENT USER STATE:", state.currentUser?.email);
 
   const renderContent = () => {
     if (!isAuthReady) {

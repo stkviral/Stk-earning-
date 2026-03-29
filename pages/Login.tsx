@@ -45,7 +45,7 @@ const Login: React.FC = () => {
     }
 
     try {
-      // Reset frontend state
+      // Reset frontend state before login
       logout();
       // Clear old session before login
       await supabase.auth.signOut();
@@ -53,8 +53,7 @@ const Login: React.FC = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
-          skipBrowserRedirect: true
+          redirectTo: window.location.origin
         }
       });
 
@@ -62,24 +61,7 @@ const Login: React.FC = () => {
         console.error("Supabase Google Login Error:", error);
         alert(`Login Error: ${error.message}`);
         setIsLoggingIn(false);
-        return;
       }
-
-      if (data?.url) {
-        const authWindow = window.open(data.url, 'oauth_popup', 'width=600,height=700');
-        if (!authWindow) {
-          alert('Please allow popups for this site to connect your account.');
-          setIsLoggingIn(false);
-        } else {
-          const checkPopup = setInterval(() => {
-            if (authWindow.closed) {
-              clearInterval(checkPopup);
-              setIsLoggingIn(false);
-            }
-          }, 1000);
-        }
-      }
-      // The redirect will happen automatically if successful
     } catch (err) {
       console.error("Supabase OAuth2 Initialization Error:", err);
       setIsLoggingIn(false);
