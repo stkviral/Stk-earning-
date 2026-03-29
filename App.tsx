@@ -308,7 +308,7 @@ const App: React.FC = () => {
                 newAllUsers.push(localUser);
               } else {
                 // Keep local updates if they are newer, or if it's the current user (to preserve transactions)
-                if (localUser.id === prev.currentUser?.id || localUser.lastActiveAt > newAllUsers[index].lastActiveAt) {
+                if (localUser.id === prev.currentUser?.id || (localUser.lastActiveAt && newAllUsers[index].lastActiveAt && localUser.lastActiveAt > newAllUsers[index].lastActiveAt)) {
                   newAllUsers[index] = { ...newAllUsers[index], ...localUser };
                 }
               }
@@ -1171,6 +1171,7 @@ const App: React.FC = () => {
             isLoggedIn: false,
             isAdminSession: false
           }));
+          setIsAuthReady(true);
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
           await handleAuth(session);
         }

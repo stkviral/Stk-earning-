@@ -13,7 +13,7 @@ const Login: React.FC = () => {
   const [name, setName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const { state, logout } = useApp();
+  const { state } = useApp();
 
   // Disable FedCM to avoid NotAllowedError in iframes
   React.useEffect(() => {
@@ -45,11 +45,6 @@ const Login: React.FC = () => {
     }
 
     try {
-      // Reset frontend state before login
-      logout();
-      // Clear old session before login
-      await supabase.auth.signOut();
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
